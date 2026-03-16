@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { useAppStore } from "@/lib/store";
 import type {
@@ -13,7 +13,9 @@ import type {
   StressLevel,
 } from "@/lib/types";
 
-const EDU_OPTIONS: { value: EducationLevel; label: string }[] = [
+// ─── Static Data ──────────────────────────────────────────────────────────────
+
+const EDU: { value: EducationLevel; label: string }[] = [
   { value: "high_school", label: "High School" },
   { value: "undergraduate", label: "Undergraduate" },
   { value: "postgraduate", label: "Postgraduate" },
@@ -21,21 +23,21 @@ const EDU_OPTIONS: { value: EducationLevel; label: string }[] = [
   { value: "professional", label: "Working Professional" },
 ];
 
-const ENERGY_OPTIONS: { value: EnergyPeakTime; label: string; emoji: string }[] = [
+const ENERGY: { value: EnergyPeakTime; label: string; emoji: string }[] = [
   { value: "morning", label: "Morning (5–11 AM)", emoji: "🌅" },
   { value: "afternoon", label: "Afternoon (12–5 PM)", emoji: "☀️" },
   { value: "evening", label: "Evening (6–9 PM)", emoji: "🌆" },
   { value: "night", label: "Night (10 PM+)", emoji: "🌙" },
 ];
 
-const EXERCISE_OPTIONS: { value: ExerciseFrequency; label: string }[] = [
+const EXERCISE: { value: ExerciseFrequency; label: string }[] = [
   { value: "never", label: "Never" },
   { value: "rarely", label: "Rarely" },
   { value: "2-3x_week", label: "2–3× per week" },
   { value: "daily", label: "Every day" },
 ];
 
-const COACH_OPTIONS: { value: CoachPersonality; label: string; desc: string }[] = [
+const COACH: { value: CoachPersonality; label: string; desc: string }[] = [
   { value: "strict", label: "Drill Sergeant", desc: "No excuses. Push me hard." },
   { value: "supportive", label: "Mentor", desc: "Encouraging and warm." },
   { value: "neutral", label: "Analyst", desc: "Just facts and plans." },
@@ -47,57 +49,45 @@ const DISTRACTIONS = [
   "Gaming", "Overthinking", "Noisy environment", "Phone notifications", "Procrastination loops",
 ];
 
-const SOCIAL_MEDIA = [
+const SOCIAL = [
   "Instagram", "YouTube", "Twitter/X", "LinkedIn", "Reddit",
   "Snapchat", "TikTok", "Discord", "WhatsApp", "Telegram",
 ];
 
-function validate(p: Partial<StudentProfile>): string[] {
-  const e: string[] = [];
-  if (!p.name?.trim()) e.push("Name is required");
-  if (!p.age || p.age < 10 || p.age > 80) e.push("Enter a valid age (10–80)");
-  if (!p.fieldOfStudy?.trim()) e.push("Field of study is required");
-  if (!p.subjects?.length) e.push("Add at least one subject");
-  if (!p.examGoals?.trim()) e.push("Exam goals are required");
-  if (!p.currentPerformance?.trim()) e.push("Current performance is required");
-  if (!p.currentStudyMethod?.trim()) e.push("Current study method is required");
-  if (!p.biggestDistractions?.length) e.push("Select at least one distraction");
-  if (!p.primaryGoal?.trim()) e.push("Primary goal is required");
-  if (!p.previousSystemsTried?.trim()) e.push("Previous systems tried is required");
-  return e;
-}
+// ─── Styles ───────────────────────────────────────────────────────────────────
 
-const inp: React.CSSProperties = {
-  width: "100%", background: "#1a1a1a", border: "1px solid #2a2a2a",
-  borderRadius: "10px", padding: "0.75rem 1rem", color: "#fff",
-  fontSize: "0.9rem", outline: "none", boxSizing: "border-box", fontFamily: "inherit",
+const S = {
+  input: {
+    width: "100%", background: "#1a1a1a", border: "1px solid #2a2a2a",
+    borderRadius: "10px", padding: "0.75rem 1rem", color: "#fff",
+    fontSize: "0.9rem", outline: "none", boxSizing: "border-box" as const,
+    fontFamily: "inherit", transition: "border-color 0.15s",
+  },
+  card: {
+    background: "#111", border: "1px solid #1e1e1e",
+    borderRadius: "16px", padding: "2rem", marginBottom: "1.5rem",
+  },
 };
 
-const sec: React.CSSProperties = {
-  background: "#111", border: "1px solid #1e1e1e",
-  borderRadius: "16px", padding: "2rem", marginBottom: "1.5rem",
-};
+// ─── Main Page ────────────────────────────────────────────────────────────────
 
 export default function OnboardingPage() {
   const router = useRouter();
   const { setStudentProfile } = useAppStore();
 
-  // ── Refs for all text inputs (no re-render on keystroke) ──────────────────
-  const nameRef = useRef<HTMLInputElement>(null);
-  const ageRef = useRef<HTMLInputElement>(null);
-  const fieldRef = useRef<HTMLInputElement>(null);
-  const examGoalsRef = useRef<HTMLTextAreaElement>(null);
-  const performanceRef = useRef<HTMLTextAreaElement>(null);
-  const studyMethodRef = useRef<HTMLTextAreaElement>(null);
-  const primaryGoalRef = useRef<HTMLTextAreaElement>(null);
-  const prevSystemsRef = useRef<HTMLTextAreaElement>(null);
-  const subjectInputRef = useRef<HTMLInputElement>(null);
-
-  // ── State only for interactive non-text fields ────────────────────────────
+  // Every single field lives in state
+  // Text fields update freely — no sub-components means no re-mount issue
+  const [name, setName] = useState("");
+  const [age, setAge] = useState("");
   const [eduLevel, setEduLevel] = useState<EducationLevel>("undergraduate");
+  const [fieldOfStudy, setFieldOfStudy] = useState("");
+  const [subjectInput, setSubjectInput] = useState("");
   const [subjects, setSubjects] = useState<string[]>([]);
+  const [examGoals, setExamGoals] = useState("");
+  const [currentPerformance, setCurrentPerformance] = useState("");
   const [dailyHours, setDailyHours] = useState(4);
   const [sessionLen, setSessionLen] = useState(45);
+  const [studyMethod, setStudyMethod] = useState("");
   const [distractions, setDistractions] = useState<string[]>([]);
   const [procrastination, setProcrastination] = useState(3);
   const [energyPeak, setEnergyPeak] = useState<EnergyPeakTime>("morning");
@@ -108,36 +98,57 @@ export default function OnboardingPage() {
   const [screenTime, setScreenTime] = useState(4);
   const [burnout, setBurnout] = useState(false);
   const [socialMedia, setSocialMedia] = useState<string[]>([]);
+  const [primaryGoal, setPrimaryGoal] = useState("");
   const [coachPersonality, setCoachPersonality] = useState<CoachPersonality>("supportive");
-
+  const [prevSystems, setPrevSystems] = useState("");
   const [errors, setErrors] = useState<string[]>([]);
-  const [submitted, setSubmitted] = useState(false);
 
-  const toggleChip = (list: string[], setList: (v: string[]) => void, val: string) => {
+  // ── Helpers ──────────────────────────────────────────────────────────────────
+
+  const toggleChip = (list: string[], setList: (v: string[]) => void, val: string) =>
     setList(list.includes(val) ? list.filter((x) => x !== val) : [...list, val]);
-  };
 
   const addSubject = () => {
-    const val = subjectInputRef.current?.value.trim();
-    if (val && !subjects.includes(val)) {
-      setSubjects([...subjects, val]);
-      if (subjectInputRef.current) subjectInputRef.current.value = "";
+    const v = subjectInput.trim();
+    if (v && !subjects.includes(v)) {
+      setSubjects([...subjects, v]);
+      setSubjectInput("");
     }
   };
 
   const handleSubmit = () => {
-    const profile: Partial<StudentProfile> = {
-      name: nameRef.current?.value.trim() ?? "",
-      age: Number(ageRef.current?.value) || 0,
+    const errs: string[] = [];
+    if (!name.trim()) errs.push("Name is required");
+    if (!age || Number(age) < 10 || Number(age) > 80) errs.push("Enter a valid age (10–80)");
+    if (!fieldOfStudy.trim()) errs.push("Field of study is required");
+    if (subjects.length === 0) errs.push("Add at least one subject");
+    if (!examGoals.trim()) errs.push("Exam goals are required");
+    if (!currentPerformance.trim()) errs.push("Current performance is required");
+    if (!studyMethod.trim()) errs.push("Current study method is required");
+    if (distractions.length === 0) errs.push("Select at least one distraction");
+    if (!primaryGoal.trim()) errs.push("Primary goal is required");
+    if (!prevSystems.trim()) errs.push("Previous systems tried is required");
+
+    if (errs.length > 0) {
+      setErrors(errs);
+      setTimeout(() => {
+        document.getElementById("error-box")?.scrollIntoView({ behavior: "smooth", block: "center" });
+      }, 50);
+      return;
+    }
+
+    const profile: StudentProfile = {
+      name: name.trim(),
+      age: Number(age),
       educationLevel: eduLevel,
-      fieldOfStudy: fieldRef.current?.value.trim() ?? "",
+      fieldOfStudy: fieldOfStudy.trim(),
       subjects,
-      examGoals: examGoalsRef.current?.value.trim() ?? "",
+      examGoals: examGoals.trim(),
       dailyStudyHoursAvailable: dailyHours,
-      currentPerformance: performanceRef.current?.value.trim() ?? "",
+      currentPerformance: currentPerformance.trim(),
       wakeUpTime: wakeTime,
       sleepTime,
-      currentStudyMethod: studyMethodRef.current?.value.trim() ?? "",
+      currentStudyMethod: studyMethod.trim(),
       averageSessionLength: sessionLen,
       biggestDistractions: distractions,
       procrastinationLevel: procrastination as ProcrastinationLevel,
@@ -147,110 +158,24 @@ export default function OnboardingPage() {
       exerciseFrequency: exercise,
       screenTimePerDay: screenTime,
       socialMediaApps: socialMedia,
-      primaryGoal: primaryGoalRef.current?.value.trim() ?? "",
+      primaryGoal: primaryGoal.trim(),
       coachPersonality,
-      previousSystemsTried: prevSystemsRef.current?.value.trim() ?? "",
+      previousSystemsTried: prevSystems.trim(),
     };
 
-    setSubmitted(true);
-    const errs = validate(profile);
-    setErrors(errs);
-    if (errs.length > 0) {
-      document.getElementById("error-box")?.scrollIntoView({ behavior: "smooth", block: "center" });
-      return;
-    }
-    setStudentProfile(profile as StudentProfile);
+    setStudentProfile(profile);
     router.push("/generating");
   };
 
-  // ── Tiny inner components (no hooks, safe here) ───────────────────────────
+  // ── Render ────────────────────────────────────────────────────────────────────
 
-  const Hdr = ({ n, title, sub }: { n: string; title: string; sub: string }) => (
-    <div style={{ marginBottom: "1.75rem" }}>
-      <div style={{ display: "flex", alignItems: "center", gap: "0.75rem", marginBottom: "0.4rem" }}>
-        <span style={{
-          width: "1.8rem", height: "1.8rem", borderRadius: "50%",
-          background: "linear-gradient(135deg, #7c3aed, #a78bfa)",
-          display: "flex", alignItems: "center", justifyContent: "center",
-          fontSize: "0.75rem", fontWeight: 700, color: "#fff", flexShrink: 0,
-        }}>{n}</span>
-        <h2 style={{ fontFamily: "'Playfair Display', serif", fontSize: "1.25rem", fontWeight: 700, color: "#fff", margin: 0 }}>{title}</h2>
-      </div>
-      <p style={{ color: "#666", fontSize: "0.82rem", margin: 0, paddingLeft: "2.55rem" }}>{sub}</p>
-    </div>
-  );
-
-  const F = ({ label, children }: { label: string; children: React.ReactNode }) => (
-    <div style={{ marginBottom: "1.25rem" }}>
-      <label style={{ display: "block", color: "#c0c0c0", fontSize: "0.82rem", fontWeight: 600, marginBottom: "0.5rem" }}>
-        {label} <span style={{ color: "#ec4899" }}>*</span>
-      </label>
-      {children}
-    </div>
-  );
-
-  const Row = ({ children }: { children: React.ReactNode }) => (
-    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "1.25rem" }}>{children}</div>
-  );
-
-  const Cards = <T extends string>({ opts, val, set }: {
-    opts: { value: T; label: string; desc?: string; emoji?: string }[]; val: T; set: (v: T) => void;
-  }) => (
-    <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(155px, 1fr))", gap: "0.65rem" }}>
-      {opts.map((o) => (
-        <button key={o.value} type="button" onClick={() => set(o.value)} style={{
-          padding: "0.9rem 1rem", borderRadius: "12px", textAlign: "left", cursor: "pointer",
-          border: `1px solid ${val === o.value ? "#7c3aed" : "#2a2a2a"}`,
-          background: val === o.value ? "rgba(124,58,237,0.15)" : "#141414",
-          color: val === o.value ? "#fff" : "#888", transition: "all 0.15s",
-        }}>
-          {o.emoji && <div style={{ fontSize: "1.2rem", marginBottom: "0.3rem" }}>{o.emoji}</div>}
-          <div style={{ fontWeight: 600, fontSize: "0.85rem", marginBottom: o.desc ? "0.2rem" : 0 }}>{o.label}</div>
-          {o.desc && <div style={{ fontSize: "0.75rem", color: "#666", lineHeight: 1.4 }}>{o.desc}</div>}
-        </button>
-      ))}
-    </div>
-  );
-
-  const Chips = ({ opts, sel, toggle }: { opts: string[]; sel: string[]; toggle: (v: string) => void }) => (
-    <div style={{ display: "flex", flexWrap: "wrap", gap: "0.5rem" }}>
-      {opts.map((o) => (
-        <button key={o} type="button" onClick={() => toggle(o)} style={{
-          padding: "0.35rem 0.85rem", borderRadius: "999px", cursor: "pointer", fontSize: "0.8rem",
-          border: `1px solid ${sel.includes(o) ? "#7c3aed" : "#2a2a2a"}`,
-          background: sel.includes(o) ? "rgba(124,58,237,0.2)" : "#1a1a1a",
-          color: sel.includes(o) ? "#a78bfa" : "#777",
-          fontWeight: sel.includes(o) ? 600 : 400, transition: "all 0.15s",
-        }}>{o}</button>
-      ))}
-    </div>
-  );
-
-  const Slider = ({ val, set, min, max, fmt }: {
-    val: number; set: (v: number) => void; min: number; max: number; fmt: (v: number) => string;
-  }) => (
-    <div>
-      <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "0.4rem" }}>
-        <span style={{ color: "#555", fontSize: "0.75rem" }}>{min}</span>
-        <span style={{ color: "#a78bfa", fontWeight: 700, fontSize: "0.9rem" }}>{fmt(val)}</span>
-        <span style={{ color: "#555", fontSize: "0.75rem" }}>{max}</span>
-      </div>
-      <input type="range" min={min} max={max} value={val} onChange={(e) => set(Number(e.target.value))}
-        style={{ width: "100%", accentColor: "#7c3aed", cursor: "pointer" }} />
-    </div>
-  );
-
-  const focus = (e: React.FocusEvent<HTMLInputElement | HTMLTextAreaElement>) => (e.currentTarget.style.borderColor = "#7c3aed");
-  const blur = (e: React.FocusEvent<HTMLInputElement | HTMLTextAreaElement>) => (e.currentTarget.style.borderColor = "#2a2a2a");
-
-  // ── Render ────────────────────────────────────────────────────────────────
   return (
     <div style={{ minHeight: "100vh", background: "#0a0a0a", fontFamily: "'Inter', sans-serif", paddingBottom: "6rem" }}>
 
-      {/* Header */}
+      {/* Navbar */}
       <div style={{
-        background: "rgba(10,10,10,0.9)", borderBottom: "1px solid #1a1a1a", padding: "0.9rem 2rem",
-        position: "sticky", top: 0, zIndex: 100, backdropFilter: "blur(12px)",
+        background: "rgba(10,10,10,0.95)", borderBottom: "1px solid #1a1a1a",
+        padding: "0.9rem 2rem", position: "sticky", top: 0, zIndex: 100, backdropFilter: "blur(12px)",
       }}>
         <span style={{
           fontFamily: "'Playfair Display', serif", fontSize: "1.1rem", fontWeight: 900,
@@ -277,48 +202,109 @@ export default function OnboardingPage() {
           </p>
         </div>
 
-        {/* Errors */}
-        {submitted && errors.length > 0 && (
+        {/* Error box */}
+        {errors.length > 0 && (
           <div id="error-box" style={{
             background: "rgba(239,68,68,0.08)", border: "1px solid rgba(239,68,68,0.3)",
             borderRadius: "12px", padding: "1.25rem 1.5rem", marginBottom: "2rem",
           }}>
-            <p style={{ color: "#f87171", fontWeight: 600, margin: "0 0 0.5rem", fontSize: "0.875rem" }}>Fix these before continuing:</p>
+            <p style={{ color: "#f87171", fontWeight: 600, margin: "0 0 0.5rem", fontSize: "0.875rem" }}>
+              Fix these before continuing:
+            </p>
             <ul style={{ margin: 0, paddingLeft: "1.25rem" }}>
-              {errors.map((e) => <li key={e} style={{ color: "#fca5a5", fontSize: "0.82rem", marginBottom: "0.2rem" }}>{e}</li>)}
+              {errors.map((e) => (
+                <li key={e} style={{ color: "#fca5a5", fontSize: "0.82rem", marginBottom: "0.2rem" }}>{e}</li>
+              ))}
             </ul>
           </div>
         )}
 
-        {/* Section 1 */}
-        <div style={sec}>
-          <Hdr n="1" title="About You" sub="Basic identity — who you are and where you are in life." />
-          <Row>
-            <F label="Your name">
-              <input ref={nameRef} placeholder="e.g. Arjun" style={inp} onFocus={focus} onBlur={blur} />
-            </F>
-            <F label="Age">
-              <input ref={ageRef} type="number" placeholder="18" style={inp} onFocus={focus} onBlur={blur} />
-            </F>
-          </Row>
-          <F label="Education level">
-            <Cards opts={EDU_OPTIONS} val={eduLevel} set={setEduLevel} />
-          </F>
-          <F label="Field of study / work">
-            <input ref={fieldRef} placeholder="e.g. Computer Science, CA Foundation, UPSC" style={inp} onFocus={focus} onBlur={blur} />
-          </F>
+        {/* ── Section 1: About You ── */}
+        <div style={S.card}>
+          <div style={{ marginBottom: "1.75rem" }}>
+            <div style={{ display: "flex", alignItems: "center", gap: "0.75rem", marginBottom: "0.4rem" }}>
+              <span style={{ width: "1.8rem", height: "1.8rem", borderRadius: "50%", background: "linear-gradient(135deg, #7c3aed, #a78bfa)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "0.75rem", fontWeight: 700, color: "#fff", flexShrink: 0 }}>1</span>
+              <h2 style={{ fontFamily: "'Playfair Display', serif", fontSize: "1.25rem", fontWeight: 700, color: "#fff", margin: 0 }}>About You</h2>
+            </div>
+            <p style={{ color: "#666", fontSize: "0.82rem", margin: 0, paddingLeft: "2.55rem" }}>Basic identity — who you are and where you are in life.</p>
+          </div>
+
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "1.25rem" }}>
+            <div style={{ marginBottom: "1.25rem" }}>
+              <label style={{ display: "block", color: "#c0c0c0", fontSize: "0.82rem", fontWeight: 600, marginBottom: "0.5rem" }}>Your name <span style={{ color: "#ec4899" }}>*</span></label>
+              <input
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                placeholder="e.g. Arjun"
+                style={S.input}
+                onFocus={(e) => (e.currentTarget.style.borderColor = "#7c3aed")}
+                onBlur={(e) => (e.currentTarget.style.borderColor = "#2a2a2a")}
+              />
+            </div>
+            <div style={{ marginBottom: "1.25rem" }}>
+              <label style={{ display: "block", color: "#c0c0c0", fontSize: "0.82rem", fontWeight: 600, marginBottom: "0.5rem" }}>Age <span style={{ color: "#ec4899" }}>*</span></label>
+              <input
+                type="number"
+                value={age}
+                onChange={(e) => setAge(e.target.value)}
+                placeholder="18"
+                style={S.input}
+                onFocus={(e) => (e.currentTarget.style.borderColor = "#7c3aed")}
+                onBlur={(e) => (e.currentTarget.style.borderColor = "#2a2a2a")}
+              />
+            </div>
+          </div>
+
+          <div style={{ marginBottom: "1.25rem" }}>
+            <label style={{ display: "block", color: "#c0c0c0", fontSize: "0.82rem", fontWeight: 600, marginBottom: "0.5rem" }}>Education level <span style={{ color: "#ec4899" }}>*</span></label>
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(155px, 1fr))", gap: "0.65rem" }}>
+              {EDU.map((o) => (
+                <button key={o.value} type="button" onClick={() => setEduLevel(o.value)} style={{
+                  padding: "0.9rem 1rem", borderRadius: "12px", textAlign: "left", cursor: "pointer",
+                  border: `1px solid ${eduLevel === o.value ? "#7c3aed" : "#2a2a2a"}`,
+                  background: eduLevel === o.value ? "rgba(124,58,237,0.15)" : "#141414",
+                  color: eduLevel === o.value ? "#fff" : "#888", transition: "all 0.15s",
+                  fontWeight: 600, fontSize: "0.85rem",
+                }}>{o.label}</button>
+              ))}
+            </div>
+          </div>
+
+          <div style={{ marginBottom: "1.25rem" }}>
+            <label style={{ display: "block", color: "#c0c0c0", fontSize: "0.82rem", fontWeight: 600, marginBottom: "0.5rem" }}>Field of study / work <span style={{ color: "#ec4899" }}>*</span></label>
+            <input
+              value={fieldOfStudy}
+              onChange={(e) => setFieldOfStudy(e.target.value)}
+              placeholder="e.g. Computer Science, CA Foundation, UPSC"
+              style={S.input}
+              onFocus={(e) => (e.currentTarget.style.borderColor = "#7c3aed")}
+              onBlur={(e) => (e.currentTarget.style.borderColor = "#2a2a2a")}
+            />
+          </div>
         </div>
 
-        {/* Section 2 */}
-        <div style={sec}>
-          <Hdr n="2" title="Academic Profile" sub="What you're studying and where you stand right now." />
+        {/* ── Section 2: Academic Profile ── */}
+        <div style={S.card}>
+          <div style={{ marginBottom: "1.75rem" }}>
+            <div style={{ display: "flex", alignItems: "center", gap: "0.75rem", marginBottom: "0.4rem" }}>
+              <span style={{ width: "1.8rem", height: "1.8rem", borderRadius: "50%", background: "linear-gradient(135deg, #7c3aed, #a78bfa)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "0.75rem", fontWeight: 700, color: "#fff", flexShrink: 0 }}>2</span>
+              <h2 style={{ fontFamily: "'Playfair Display', serif", fontSize: "1.25rem", fontWeight: 700, color: "#fff", margin: 0 }}>Academic Profile</h2>
+            </div>
+            <p style={{ color: "#666", fontSize: "0.82rem", margin: 0, paddingLeft: "2.55rem" }}>What you're studying and where you stand right now.</p>
+          </div>
 
-          <F label="Subjects you study">
+          <div style={{ marginBottom: "1.25rem" }}>
+            <label style={{ display: "block", color: "#c0c0c0", fontSize: "0.82rem", fontWeight: 600, marginBottom: "0.5rem" }}>Subjects you study <span style={{ color: "#ec4899" }}>*</span></label>
             <div style={{ display: "flex", gap: "0.5rem", marginBottom: "0.65rem" }}>
-              <input ref={subjectInputRef} placeholder="Type a subject and press Enter or Add"
-                style={{ ...inp, flex: 1 }}
+              <input
+                value={subjectInput}
+                onChange={(e) => setSubjectInput(e.target.value)}
                 onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); addSubject(); } }}
-                onFocus={focus} onBlur={blur} />
+                placeholder="Type a subject and press Enter or Add"
+                style={{ ...S.input, flex: 1 }}
+                onFocus={(e) => (e.currentTarget.style.borderColor = "#7c3aed")}
+                onBlur={(e) => (e.currentTarget.style.borderColor = "#2a2a2a")}
+              />
               <button type="button" onClick={addSubject} style={{
                 padding: "0.75rem 1.1rem", background: "#7c3aed", color: "#fff",
                 border: "none", borderRadius: "10px", cursor: "pointer", fontWeight: 600, fontSize: "0.85rem", whiteSpace: "nowrap",
@@ -339,141 +325,279 @@ export default function OnboardingPage() {
                 ))}
               </div>
             )}
-          </F>
-
-          <F label="Exam goals / targets">
-            <textarea ref={examGoalsRef} rows={3} placeholder="e.g. Score 90%+ in boards, crack JEE Mains, pass CA Inter in May 2025"
-              style={{ ...inp, resize: "vertical" }} onFocus={focus} onBlur={blur} />
-          </F>
-
-          <F label="Current performance">
-            <textarea ref={performanceRef} rows={2} placeholder="e.g. Scoring 65–70%, weak in Maths, decent in Chemistry"
-              style={{ ...inp, resize: "vertical" }} onFocus={focus} onBlur={blur} />
-          </F>
-
-          <Row>
-            <F label="Hours available daily">
-              <Slider val={dailyHours} set={setDailyHours} min={1} max={14} fmt={(v) => `${v} hrs/day`} />
-            </F>
-            <F label="Avg session length">
-              <Slider val={sessionLen} set={setSessionLen} min={15} max={180} fmt={(v) => `${v} min`} />
-            </F>
-          </Row>
-        </div>
-
-        {/* Section 3 */}
-        <div style={sec}>
-          <Hdr n="3" title="Study Habits" sub="How you currently study — be brutally honest." />
-
-          <F label="Current study method">
-            <textarea ref={studyMethodRef} rows={2} placeholder="e.g. Read NCERT + watch YouTube, make notes sometimes, revise day before exams"
-              style={{ ...inp, resize: "vertical" }} onFocus={focus} onBlur={blur} />
-          </F>
-
-          <F label="Biggest distractions">
-            <Chips opts={DISTRACTIONS} sel={distractions} toggle={(v) => toggleChip(distractions, setDistractions, v)} />
-          </F>
-
-          <Row>
-            <F label="Procrastination level">
-              <Slider val={procrastination} set={setProcrastination} min={1} max={5}
-                fmt={(v) => ["Never", "Rarely", "Sometimes", "Often", "Always"][v - 1]} />
-            </F>
-            <F label="Peak energy time">
-              <Cards opts={ENERGY_OPTIONS} val={energyPeak} set={setEnergyPeak} />
-            </F>
-          </Row>
-        </div>
-
-        {/* Section 4 */}
-        <div style={sec}>
-          <Hdr n="4" title="Daily Schedule" sub="Your current daily rhythm so we can design around it." />
-          <Row>
-            <F label="Wake-up time">
-              <input type="time" value={wakeTime} onChange={(e) => setWakeTime(e.target.value)}
-                style={inp} onFocus={focus} onBlur={blur} />
-            </F>
-            <F label="Sleep time">
-              <input type="time" value={sleepTime} onChange={(e) => setSleepTime(e.target.value)}
-                style={inp} onFocus={focus} onBlur={blur} />
-            </F>
-          </Row>
-        </div>
-
-        {/* Section 5 */}
-        <div style={sec}>
-          <Hdr n="5" title="Wellbeing" sub="Physical and mental health directly impacts how well you learn." />
-          <Row>
-            <F label="Stress level">
-              <Slider val={stress} set={setStress} min={1} max={5}
-                fmt={(v) => ["Very relaxed", "Low", "Moderate", "High", "Extreme"][v - 1]} />
-            </F>
-            <F label="Exercise frequency">
-              <select value={exercise} onChange={(e) => setExercise(e.target.value as ExerciseFrequency)}
-                style={{
-                  ...inp, cursor: "pointer",
-                  backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%23a0a0a0' d='M6 8L1 3h10z'/%3E%3C/svg%3E")`,
-                  backgroundRepeat: "no-repeat", backgroundPosition: "right 1rem center",
-                  backgroundSize: "12px", paddingRight: "2.5rem",
-                }}>
-                {EXERCISE_OPTIONS.map((o) => <option key={o.value} value={o.value} style={{ background: "#1a1a1a" }}>{o.label}</option>)}
-              </select>
-            </F>
-          </Row>
-
-          <Row>
-            <F label="Screen time per day (non-study)">
-              <Slider val={screenTime} set={setScreenTime} min={0} max={16} fmt={(v) => `${v} hrs`} />
-            </F>
-            <F label="Burnout symptoms">
-              <div style={{ paddingTop: "0.5rem" }}>
-                <button type="button" onClick={() => setBurnout(!burnout)}
-                  style={{ display: "flex", alignItems: "center", gap: "0.75rem", background: "none", border: "none", cursor: "pointer", padding: 0 }}>
-                  <span style={{
-                    width: "44px", height: "24px", borderRadius: "999px",
-                    background: burnout ? "#7c3aed" : "#2a2a2a",
-                    position: "relative", display: "block", transition: "background 0.2s", flexShrink: 0,
-                  }}>
-                    <span style={{
-                      position: "absolute", top: "3px", left: burnout ? "23px" : "3px",
-                      width: "18px", height: "18px", borderRadius: "50%", background: "#fff",
-                      transition: "left 0.2s", display: "block",
-                    }} />
-                  </span>
-                  <span style={{ color: "#c0c0c0", fontSize: "0.88rem" }}>{burnout ? "Yes, feeling burnt out" : "No, I'm okay"}</span>
-                </button>
-              </div>
-            </F>
-          </Row>
+          </div>
 
           <div style={{ marginBottom: "1.25rem" }}>
-            <label style={{ display: "block", color: "#c0c0c0", fontSize: "0.82rem", fontWeight: 600, marginBottom: "0.5rem" }}>
-              Social media apps you use
-            </label>
-            <Chips opts={SOCIAL_MEDIA} sel={socialMedia} toggle={(v) => toggleChip(socialMedia, setSocialMedia, v)} />
+            <label style={{ display: "block", color: "#c0c0c0", fontSize: "0.82rem", fontWeight: 600, marginBottom: "0.5rem" }}>Exam goals / targets <span style={{ color: "#ec4899" }}>*</span></label>
+            <textarea
+              value={examGoals}
+              onChange={(e) => setExamGoals(e.target.value)}
+              rows={3}
+              placeholder="e.g. Score 90%+ in boards, crack JEE Mains, pass CA Inter in May 2025"
+              style={{ ...S.input, resize: "vertical" }}
+              onFocus={(e) => (e.currentTarget.style.borderColor = "#7c3aed")}
+              onBlur={(e) => (e.currentTarget.style.borderColor = "#2a2a2a")}
+            />
+          </div>
+
+          <div style={{ marginBottom: "1.25rem" }}>
+            <label style={{ display: "block", color: "#c0c0c0", fontSize: "0.82rem", fontWeight: 600, marginBottom: "0.5rem" }}>Current performance <span style={{ color: "#ec4899" }}>*</span></label>
+            <textarea
+              value={currentPerformance}
+              onChange={(e) => setCurrentPerformance(e.target.value)}
+              rows={2}
+              placeholder="e.g. Scoring 65–70%, weak in Maths, decent in Chemistry"
+              style={{ ...S.input, resize: "vertical" }}
+              onFocus={(e) => (e.currentTarget.style.borderColor = "#7c3aed")}
+              onBlur={(e) => (e.currentTarget.style.borderColor = "#2a2a2a")}
+            />
+          </div>
+
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "1.25rem" }}>
+            <div style={{ marginBottom: "1.25rem" }}>
+              <label style={{ display: "block", color: "#c0c0c0", fontSize: "0.82rem", fontWeight: 600, marginBottom: "0.5rem" }}>Hours available daily <span style={{ color: "#ec4899" }}>*</span></label>
+              <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "0.4rem" }}>
+                <span style={{ color: "#555", fontSize: "0.75rem" }}>1</span>
+                <span style={{ color: "#a78bfa", fontWeight: 700, fontSize: "0.9rem" }}>{dailyHours} hrs/day</span>
+                <span style={{ color: "#555", fontSize: "0.75rem" }}>14</span>
+              </div>
+              <input type="range" min={1} max={14} value={dailyHours} onChange={(e) => setDailyHours(Number(e.target.value))}
+                style={{ width: "100%", accentColor: "#7c3aed", cursor: "pointer" }} />
+            </div>
+            <div style={{ marginBottom: "1.25rem" }}>
+              <label style={{ display: "block", color: "#c0c0c0", fontSize: "0.82rem", fontWeight: 600, marginBottom: "0.5rem" }}>Avg session length <span style={{ color: "#ec4899" }}>*</span></label>
+              <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "0.4rem" }}>
+                <span style={{ color: "#555", fontSize: "0.75rem" }}>15</span>
+                <span style={{ color: "#a78bfa", fontWeight: 700, fontSize: "0.9rem" }}>{sessionLen} min</span>
+                <span style={{ color: "#555", fontSize: "0.75rem" }}>180</span>
+              </div>
+              <input type="range" min={15} max={180} value={sessionLen} onChange={(e) => setSessionLen(Number(e.target.value))}
+                style={{ width: "100%", accentColor: "#7c3aed", cursor: "pointer" }} />
+            </div>
           </div>
         </div>
 
-        {/* Section 6 */}
-        <div style={sec}>
-          <Hdr n="6" title="Goals & Coaching" sub="What you want and how you want to be coached." />
+        {/* ── Section 3: Study Habits ── */}
+        <div style={S.card}>
+          <div style={{ marginBottom: "1.75rem" }}>
+            <div style={{ display: "flex", alignItems: "center", gap: "0.75rem", marginBottom: "0.4rem" }}>
+              <span style={{ width: "1.8rem", height: "1.8rem", borderRadius: "50%", background: "linear-gradient(135deg, #7c3aed, #a78bfa)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "0.75rem", fontWeight: 700, color: "#fff", flexShrink: 0 }}>3</span>
+              <h2 style={{ fontFamily: "'Playfair Display', serif", fontSize: "1.25rem", fontWeight: 700, color: "#fff", margin: 0 }}>Study Habits</h2>
+            </div>
+            <p style={{ color: "#666", fontSize: "0.82rem", margin: 0, paddingLeft: "2.55rem" }}>How you currently study — be brutally honest.</p>
+          </div>
 
-          <F label="Primary goal (in your own words)">
-            <textarea ref={primaryGoalRef} rows={2} placeholder="e.g. I want to stop wasting time and study consistently so I can crack NEET this year"
-              style={{ ...inp, resize: "vertical" }} onFocus={focus} onBlur={blur} />
-          </F>
+          <div style={{ marginBottom: "1.25rem" }}>
+            <label style={{ display: "block", color: "#c0c0c0", fontSize: "0.82rem", fontWeight: 600, marginBottom: "0.5rem" }}>Current study method <span style={{ color: "#ec4899" }}>*</span></label>
+            <textarea
+              value={studyMethod}
+              onChange={(e) => setStudyMethod(e.target.value)}
+              rows={2}
+              placeholder="e.g. Read NCERT + watch YouTube, make notes sometimes, revise day before exams"
+              style={{ ...S.input, resize: "vertical" }}
+              onFocus={(e) => (e.currentTarget.style.borderColor = "#7c3aed")}
+              onBlur={(e) => (e.currentTarget.style.borderColor = "#2a2a2a")}
+            />
+          </div>
 
-          <F label="Coach personality">
-            <Cards opts={COACH_OPTIONS} val={coachPersonality} set={setCoachPersonality} />
-          </F>
+          <div style={{ marginBottom: "1.25rem" }}>
+            <label style={{ display: "block", color: "#c0c0c0", fontSize: "0.82rem", fontWeight: 600, marginBottom: "0.5rem" }}>Biggest distractions <span style={{ color: "#ec4899" }}>*</span></label>
+            <div style={{ display: "flex", flexWrap: "wrap", gap: "0.5rem" }}>
+              {DISTRACTIONS.map((o) => (
+                <button key={o} type="button" onClick={() => toggleChip(distractions, setDistractions, o)} style={{
+                  padding: "0.35rem 0.85rem", borderRadius: "999px", cursor: "pointer", fontSize: "0.8rem",
+                  border: `1px solid ${distractions.includes(o) ? "#7c3aed" : "#2a2a2a"}`,
+                  background: distractions.includes(o) ? "rgba(124,58,237,0.2)" : "#1a1a1a",
+                  color: distractions.includes(o) ? "#a78bfa" : "#777",
+                  fontWeight: distractions.includes(o) ? 600 : 400, transition: "all 0.15s",
+                }}>{o}</button>
+              ))}
+            </div>
+          </div>
 
-          <F label="Previous systems you've tried">
-            <textarea ref={prevSystemsRef} rows={2} placeholder="e.g. Tried Pomodoro but kept skipping. Made timetables but never followed them."
-              style={{ ...inp, resize: "vertical" }} onFocus={focus} onBlur={blur} />
-          </F>
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "1.25rem" }}>
+            <div style={{ marginBottom: "1.25rem" }}>
+              <label style={{ display: "block", color: "#c0c0c0", fontSize: "0.82rem", fontWeight: 600, marginBottom: "0.5rem" }}>Procrastination level <span style={{ color: "#ec4899" }}>*</span></label>
+              <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "0.4rem" }}>
+                <span style={{ color: "#555", fontSize: "0.75rem" }}>1</span>
+                <span style={{ color: "#a78bfa", fontWeight: 700, fontSize: "0.9rem" }}>{["Never", "Rarely", "Sometimes", "Often", "Always"][procrastination - 1]}</span>
+                <span style={{ color: "#555", fontSize: "0.75rem" }}>5</span>
+              </div>
+              <input type="range" min={1} max={5} value={procrastination} onChange={(e) => setProcrastination(Number(e.target.value))}
+                style={{ width: "100%", accentColor: "#7c3aed", cursor: "pointer" }} />
+            </div>
+            <div style={{ marginBottom: "1.25rem" }}>
+              <label style={{ display: "block", color: "#c0c0c0", fontSize: "0.82rem", fontWeight: 600, marginBottom: "0.5rem" }}>Peak energy time <span style={{ color: "#ec4899" }}>*</span></label>
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "0.5rem" }}>
+                {ENERGY.map((o) => (
+                  <button key={o.value} type="button" onClick={() => setEnergyPeak(o.value)} style={{
+                    padding: "0.6rem 0.75rem", borderRadius: "10px", textAlign: "left", cursor: "pointer",
+                    border: `1px solid ${energyPeak === o.value ? "#7c3aed" : "#2a2a2a"}`,
+                    background: energyPeak === o.value ? "rgba(124,58,237,0.15)" : "#141414",
+                    color: energyPeak === o.value ? "#fff" : "#888", transition: "all 0.15s", fontSize: "0.78rem",
+                  }}>
+                    <span style={{ marginRight: "0.3rem" }}>{o.emoji}</span>{o.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+          </div>
         </div>
 
-        {/* Submit */}
+        {/* ── Section 4: Daily Schedule ── */}
+        <div style={S.card}>
+          <div style={{ marginBottom: "1.75rem" }}>
+            <div style={{ display: "flex", alignItems: "center", gap: "0.75rem", marginBottom: "0.4rem" }}>
+              <span style={{ width: "1.8rem", height: "1.8rem", borderRadius: "50%", background: "linear-gradient(135deg, #7c3aed, #a78bfa)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "0.75rem", fontWeight: 700, color: "#fff", flexShrink: 0 }}>4</span>
+              <h2 style={{ fontFamily: "'Playfair Display', serif", fontSize: "1.25rem", fontWeight: 700, color: "#fff", margin: 0 }}>Daily Schedule</h2>
+            </div>
+            <p style={{ color: "#666", fontSize: "0.82rem", margin: 0, paddingLeft: "2.55rem" }}>Your current daily rhythm so we can design around it.</p>
+          </div>
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "1.25rem" }}>
+            <div style={{ marginBottom: "1.25rem" }}>
+              <label style={{ display: "block", color: "#c0c0c0", fontSize: "0.82rem", fontWeight: 600, marginBottom: "0.5rem" }}>Wake-up time <span style={{ color: "#ec4899" }}>*</span></label>
+              <input type="time" value={wakeTime} onChange={(e) => setWakeTime(e.target.value)} style={S.input}
+                onFocus={(e) => (e.currentTarget.style.borderColor = "#7c3aed")}
+                onBlur={(e) => (e.currentTarget.style.borderColor = "#2a2a2a")} />
+            </div>
+            <div style={{ marginBottom: "1.25rem" }}>
+              <label style={{ display: "block", color: "#c0c0c0", fontSize: "0.82rem", fontWeight: 600, marginBottom: "0.5rem" }}>Sleep time <span style={{ color: "#ec4899" }}>*</span></label>
+              <input type="time" value={sleepTime} onChange={(e) => setSleepTime(e.target.value)} style={S.input}
+                onFocus={(e) => (e.currentTarget.style.borderColor = "#7c3aed")}
+                onBlur={(e) => (e.currentTarget.style.borderColor = "#2a2a2a")} />
+            </div>
+          </div>
+        </div>
+
+        {/* ── Section 5: Wellbeing ── */}
+        <div style={S.card}>
+          <div style={{ marginBottom: "1.75rem" }}>
+            <div style={{ display: "flex", alignItems: "center", gap: "0.75rem", marginBottom: "0.4rem" }}>
+              <span style={{ width: "1.8rem", height: "1.8rem", borderRadius: "50%", background: "linear-gradient(135deg, #7c3aed, #a78bfa)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "0.75rem", fontWeight: 700, color: "#fff", flexShrink: 0 }}>5</span>
+              <h2 style={{ fontFamily: "'Playfair Display', serif", fontSize: "1.25rem", fontWeight: 700, color: "#fff", margin: 0 }}>Wellbeing</h2>
+            </div>
+            <p style={{ color: "#666", fontSize: "0.82rem", margin: 0, paddingLeft: "2.55rem" }}>Physical and mental health directly impacts how well you learn.</p>
+          </div>
+
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "1.25rem" }}>
+            <div style={{ marginBottom: "1.25rem" }}>
+              <label style={{ display: "block", color: "#c0c0c0", fontSize: "0.82rem", fontWeight: 600, marginBottom: "0.5rem" }}>Stress level <span style={{ color: "#ec4899" }}>*</span></label>
+              <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "0.4rem" }}>
+                <span style={{ color: "#555", fontSize: "0.75rem" }}>1</span>
+                <span style={{ color: "#a78bfa", fontWeight: 700, fontSize: "0.9rem" }}>{["Very relaxed", "Low", "Moderate", "High", "Extreme"][stress - 1]}</span>
+                <span style={{ color: "#555", fontSize: "0.75rem" }}>5</span>
+              </div>
+              <input type="range" min={1} max={5} value={stress} onChange={(e) => setStress(Number(e.target.value))}
+                style={{ width: "100%", accentColor: "#7c3aed", cursor: "pointer" }} />
+            </div>
+            <div style={{ marginBottom: "1.25rem" }}>
+              <label style={{ display: "block", color: "#c0c0c0", fontSize: "0.82rem", fontWeight: 600, marginBottom: "0.5rem" }}>Exercise frequency <span style={{ color: "#ec4899" }}>*</span></label>
+              <select value={exercise} onChange={(e) => setExercise(e.target.value as ExerciseFrequency)} style={{
+                ...S.input, cursor: "pointer",
+                backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%23a0a0a0' d='M6 8L1 3h10z'/%3E%3C/svg%3E")`,
+                backgroundRepeat: "no-repeat", backgroundPosition: "right 1rem center", backgroundSize: "12px", paddingRight: "2.5rem",
+              }}>
+                {EXERCISE.map((o) => <option key={o.value} value={o.value} style={{ background: "#1a1a1a" }}>{o.label}</option>)}
+              </select>
+            </div>
+          </div>
+
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "1.25rem" }}>
+            <div style={{ marginBottom: "1.25rem" }}>
+              <label style={{ display: "block", color: "#c0c0c0", fontSize: "0.82rem", fontWeight: 600, marginBottom: "0.5rem" }}>Screen time/day (non-study) <span style={{ color: "#ec4899" }}>*</span></label>
+              <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "0.4rem" }}>
+                <span style={{ color: "#555", fontSize: "0.75rem" }}>0</span>
+                <span style={{ color: "#a78bfa", fontWeight: 700, fontSize: "0.9rem" }}>{screenTime} hrs</span>
+                <span style={{ color: "#555", fontSize: "0.75rem" }}>16</span>
+              </div>
+              <input type="range" min={0} max={16} value={screenTime} onChange={(e) => setScreenTime(Number(e.target.value))}
+                style={{ width: "100%", accentColor: "#7c3aed", cursor: "pointer" }} />
+            </div>
+            <div style={{ marginBottom: "1.25rem" }}>
+              <label style={{ display: "block", color: "#c0c0c0", fontSize: "0.82rem", fontWeight: 600, marginBottom: "0.5rem" }}>Burnout symptoms</label>
+              <div style={{ paddingTop: "0.5rem" }}>
+                <button type="button" onClick={() => setBurnout(!burnout)}
+                  style={{ display: "flex", alignItems: "center", gap: "0.75rem", background: "none", border: "none", cursor: "pointer", padding: 0 }}>
+                  <span style={{ width: "44px", height: "24px", borderRadius: "999px", background: burnout ? "#7c3aed" : "#2a2a2a", position: "relative", display: "block", transition: "background 0.2s", flexShrink: 0 }}>
+                    <span style={{ position: "absolute", top: "3px", left: burnout ? "23px" : "3px", width: "18px", height: "18px", borderRadius: "50%", background: "#fff", transition: "left 0.2s", display: "block" }} />
+                  </span>
+                  <span style={{ color: "#c0c0c0", fontSize: "0.88rem" }}>{burnout ? "Yes, burnt out" : "No, I'm okay"}</span>
+                </button>
+              </div>
+            </div>
+          </div>
+
+          <div style={{ marginBottom: "1.25rem" }}>
+            <label style={{ display: "block", color: "#c0c0c0", fontSize: "0.82rem", fontWeight: 600, marginBottom: "0.5rem" }}>Social media apps you use</label>
+            <div style={{ display: "flex", flexWrap: "wrap", gap: "0.5rem" }}>
+              {SOCIAL.map((o) => (
+                <button key={o} type="button" onClick={() => toggleChip(socialMedia, setSocialMedia, o)} style={{
+                  padding: "0.35rem 0.85rem", borderRadius: "999px", cursor: "pointer", fontSize: "0.8rem",
+                  border: `1px solid ${socialMedia.includes(o) ? "#7c3aed" : "#2a2a2a"}`,
+                  background: socialMedia.includes(o) ? "rgba(124,58,237,0.2)" : "#1a1a1a",
+                  color: socialMedia.includes(o) ? "#a78bfa" : "#777",
+                  fontWeight: socialMedia.includes(o) ? 600 : 400, transition: "all 0.15s",
+                }}>{o}</button>
+              ))}
+            </div>
+          </div>
+        </div>
+
+        {/* ── Section 6: Goals & Coaching ── */}
+        <div style={S.card}>
+          <div style={{ marginBottom: "1.75rem" }}>
+            <div style={{ display: "flex", alignItems: "center", gap: "0.75rem", marginBottom: "0.4rem" }}>
+              <span style={{ width: "1.8rem", height: "1.8rem", borderRadius: "50%", background: "linear-gradient(135deg, #7c3aed, #a78bfa)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "0.75rem", fontWeight: 700, color: "#fff", flexShrink: 0 }}>6</span>
+              <h2 style={{ fontFamily: "'Playfair Display', serif", fontSize: "1.25rem", fontWeight: 700, color: "#fff", margin: 0 }}>Goals & Coaching</h2>
+            </div>
+            <p style={{ color: "#666", fontSize: "0.82rem", margin: 0, paddingLeft: "2.55rem" }}>What you want and how you want to be coached.</p>
+          </div>
+
+          <div style={{ marginBottom: "1.25rem" }}>
+            <label style={{ display: "block", color: "#c0c0c0", fontSize: "0.82rem", fontWeight: 600, marginBottom: "0.5rem" }}>Primary goal (in your own words) <span style={{ color: "#ec4899" }}>*</span></label>
+            <textarea
+              value={primaryGoal}
+              onChange={(e) => setPrimaryGoal(e.target.value)}
+              rows={2}
+              placeholder="e.g. I want to stop wasting time and study consistently so I can crack NEET this year"
+              style={{ ...S.input, resize: "vertical" }}
+              onFocus={(e) => (e.currentTarget.style.borderColor = "#7c3aed")}
+              onBlur={(e) => (e.currentTarget.style.borderColor = "#2a2a2a")}
+            />
+          </div>
+
+          <div style={{ marginBottom: "1.25rem" }}>
+            <label style={{ display: "block", color: "#c0c0c0", fontSize: "0.82rem", fontWeight: 600, marginBottom: "0.5rem" }}>Coach personality <span style={{ color: "#ec4899" }}>*</span></label>
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(155px, 1fr))", gap: "0.65rem" }}>
+              {COACH.map((o) => (
+                <button key={o.value} type="button" onClick={() => setCoachPersonality(o.value)} style={{
+                  padding: "0.9rem 1rem", borderRadius: "12px", textAlign: "left", cursor: "pointer",
+                  border: `1px solid ${coachPersonality === o.value ? "#7c3aed" : "#2a2a2a"}`,
+                  background: coachPersonality === o.value ? "rgba(124,58,237,0.15)" : "#141414",
+                  color: coachPersonality === o.value ? "#fff" : "#888", transition: "all 0.15s",
+                }}>
+                  <div style={{ fontWeight: 600, fontSize: "0.85rem", marginBottom: "0.2rem" }}>{o.label}</div>
+                  <div style={{ fontSize: "0.75rem", color: "#666", lineHeight: 1.4 }}>{o.desc}</div>
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <div style={{ marginBottom: "1.25rem" }}>
+            <label style={{ display: "block", color: "#c0c0c0", fontSize: "0.82rem", fontWeight: 600, marginBottom: "0.5rem" }}>Previous systems you&apos;ve tried <span style={{ color: "#ec4899" }}>*</span></label>
+            <textarea
+              value={prevSystems}
+              onChange={(e) => setPrevSystems(e.target.value)}
+              rows={2}
+              placeholder="e.g. Tried Pomodoro but kept skipping. Made timetables but never followed them."
+              style={{ ...S.input, resize: "vertical" }}
+              onFocus={(e) => (e.currentTarget.style.borderColor = "#7c3aed")}
+              onBlur={(e) => (e.currentTarget.style.borderColor = "#2a2a2a")}
+            />
+          </div>
+        </div>
+
+        {/* ── Submit ── */}
         <div style={{ textAlign: "center", paddingTop: "1rem" }}>
           <button type="button" onClick={handleSubmit} style={{
             padding: "1rem 3rem", background: "linear-gradient(135deg, #7c3aed, #ec4899)",
