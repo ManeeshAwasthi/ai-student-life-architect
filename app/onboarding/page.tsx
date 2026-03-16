@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { useAppStore } from "@/lib/store";
 import type {
@@ -22,10 +22,10 @@ const EDU: { value: EducationLevel; label: string }[] = [
 ];
 
 const ENERGY: { value: EnergyPeakTime; label: string; emoji: string }[] = [
-  { value: "morning", label: "Morning (5–11 AM)", emoji: "🌅" },
-  { value: "afternoon", label: "Afternoon (12–5 PM)", emoji: "☀️" },
-  { value: "evening", label: "Evening (6–9 PM)", emoji: "🌆" },
-  { value: "night", label: "Night (10 PM+)", emoji: "🌙" },
+  { value: "morning", label: "Morning", emoji: "🌅" },
+  { value: "afternoon", label: "Afternoon", emoji: "☀️" },
+  { value: "evening", label: "Evening", emoji: "🌆" },
+  { value: "night", label: "Night", emoji: "🌙" },
 ];
 
 const EXERCISE: { value: ExerciseFrequency; label: string }[] = [
@@ -52,6 +52,26 @@ const SOCIAL = [
   "Snapchat", "TikTok", "Discord", "WhatsApp", "Telegram",
 ];
 
+// Single state object — only ONE useState for all text fields
+// This means updating one field does NOT re-render unrelated inputs
+type TextFields = {
+  name: string;
+  age: string;
+  fieldOfStudy: string;
+  examGoals: string;
+  currentPerformance: string;
+  currentStudyMethod: string;
+  primaryGoal: string;
+  previousSystemsTried: string;
+  subjectInput: string;
+};
+
+const INITIAL: TextFields = {
+  name: "", age: "", fieldOfStudy: "", examGoals: "",
+  currentPerformance: "", currentStudyMethod: "",
+  primaryGoal: "", previousSystemsTried: "", subjectInput: "",
+};
+
 const inp: React.CSSProperties = {
   width: "100%", background: "#1a1a1a", border: "1px solid #2a2a2a",
   borderRadius: "10px", padding: "0.75rem 1rem", color: "#fff",
@@ -73,10 +93,15 @@ export default function OnboardingPage() {
   const router = useRouter();
   const { setStudentProfile } = useAppStore();
 
-  // Only state for interactive non-text fields
+  // All text in ONE object — updating one key doesn't affect other inputs
+  const [text, setText] = useState<TextFields>(INITIAL);
+  const setField = useCallback((key: keyof TextFields, val: string) => {
+    setText((prev) => ({ ...prev, [key]: val }));
+  }, []);
+
+  // Non-text interactive fields
   const [eduLevel, setEduLevel] = useState<EducationLevel>("undergraduate");
   const [subjects, setSubjects] = useState<string[]>([]);
-  const [subjectInput, setSubjectInput] = useState("");
   const [dailyHours, setDailyHours] = useState(4);
   const [sessionLen, setSessionLen] = useState(45);
   const [distractions, setDistractions] = useState<string[]>([]);
@@ -95,43 +120,29 @@ export default function OnboardingPage() {
   const toggle = (list: string[], setList: (v: string[]) => void, val: string) =>
     setList(list.includes(val) ? list.filter((x) => x !== val) : [...list, val]);
 
-  const addSubject = () => {
-    const v = subjectInput.trim();
+  const addSubject = useCallback(() => {
+    const v = text.subjectInput.trim();
     if (v && !subjects.includes(v)) {
-      setSubjects([...subjects, v]);
-      setSubjectInput("");
+      setSubjects((prev) => [...prev, v]);
+      setField("subjectInput", "");
     }
-  };
+  }, [text.subjectInput, subjects, setField]);
 
-  // Read text values directly from DOM by name — bypasses React entirely
-  const getField = (name: string): string => {
-    if (typeof document === "undefined") return "";
-    const el = document.querySelector(`[name="${name}"]`) as HTMLInputElement | HTMLTextAreaElement | null;
-    return el?.value.trim() ?? "";
-  };
-
-  const handleSubmit = () => {
-    // Read from DOM — React state changes cannot affect these
-    const name = getField("name");
-    const age = Number(getField("age")) || 0;
-    const fieldOfStudy = getField("fieldOfStudy");
-    const examGoals = getField("examGoals");
-    const currentPerformance = getField("currentPerformance");
-    const currentStudyMethod = getField("currentStudyMethod");
-    const primaryGoal = getField("primaryGoal");
-    const previousSystemsTried = getField("previousSystemsTried");
+  const handleSubmit = useCallback(() => {
+    // Capture all values at this exact moment
+    const snap = { ...text };
 
     const errs: string[] = [];
-    if (!name) errs.push("Name is required");
-    if (!age || age < 10 || age > 80) errs.push("Enter a valid age (10–80)");
-    if (!fieldOfStudy) errs.push("Field of study is required");
+    if (!snap.name.trim()) errs.push("Name is required");
+    if (!snap.age || Number(snap.age) < 10 || Number(snap.age) > 80) errs.push("Enter a valid age (10–80)");
+    if (!snap.fieldOfStudy.trim()) errs.push("Field of study is required");
     if (subjects.length === 0) errs.push("Add at least one subject");
-    if (!examGoals) errs.push("Exam goals are required");
-    if (!currentPerformance) errs.push("Current performance is required");
-    if (!currentStudyMethod) errs.push("Current study method is required");
+    if (!snap.examGoals.trim()) errs.push("Exam goals are required");
+    if (!snap.currentPerformance.trim()) errs.push("Current performance is required");
+    if (!snap.currentStudyMethod.trim()) errs.push("Current study method is required");
     if (distractions.length === 0) errs.push("Select at least one distraction");
-    if (!primaryGoal) errs.push("Primary goal is required");
-    if (!previousSystemsTried) errs.push("Previous systems tried is required");
+    if (!snap.primaryGoal.trim()) errs.push("Primary goal is required");
+    if (!snap.previousSystemsTried.trim()) errs.push("Previous systems tried is required");
 
     if (errs.length > 0) {
       setErrors(errs);
@@ -141,14 +152,18 @@ export default function OnboardingPage() {
       return;
     }
 
-    setErrors([]);
-
     const profile: StudentProfile = {
-      name, age, fieldOfStudy, examGoals, currentPerformance,
-      currentStudyMethod, primaryGoal, previousSystemsTried,
-      educationLevel: eduLevel, subjects,
+      name: snap.name.trim(),
+      age: Number(snap.age),
+      educationLevel: eduLevel,
+      fieldOfStudy: snap.fieldOfStudy.trim(),
+      subjects,
+      examGoals: snap.examGoals.trim(),
       dailyStudyHoursAvailable: dailyHours,
-      wakeUpTime: wakeTime, sleepTime,
+      currentPerformance: snap.currentPerformance.trim(),
+      wakeUpTime: wakeTime,
+      sleepTime,
+      currentStudyMethod: snap.currentStudyMethod.trim(),
       averageSessionLength: sessionLen,
       biggestDistractions: distractions,
       procrastinationLevel: procrastination as ProcrastinationLevel,
@@ -158,12 +173,16 @@ export default function OnboardingPage() {
       exerciseFrequency: exercise,
       screenTimePerDay: screenTime,
       socialMediaApps: socialMedia,
+      primaryGoal: snap.primaryGoal.trim(),
       coachPersonality,
+      previousSystemsTried: snap.previousSystemsTried.trim(),
     };
 
     setStudentProfile(profile);
     router.push("/generating");
-  };
+  }, [text, subjects, distractions, eduLevel, dailyHours, sessionLen,
+    wakeTime, sleepTime, procrastination, energyPeak, stress, exercise,
+    screenTime, burnout, socialMedia, coachPersonality, setStudentProfile, router]);
 
   const fo = (e: React.FocusEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) =>
     (e.currentTarget.style.borderColor = "#7c3aed");
@@ -226,11 +245,22 @@ export default function OnboardingPage() {
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "1.25rem", marginBottom: "1.25rem" }}>
             <div>
               <label style={lbl}>Your name <span style={{ color: "#ec4899" }}>*</span></label>
-              <input name="name" placeholder="e.g. Arjun" style={inp} onFocus={fo} onBlur={bl} />
+              <input
+                value={text.name}
+                onChange={(e) => setField("name", e.target.value)}
+                placeholder="e.g. Arjun"
+                style={inp} onFocus={fo} onBlur={bl}
+              />
             </div>
             <div>
               <label style={lbl}>Age <span style={{ color: "#ec4899" }}>*</span></label>
-              <input name="age" type="number" placeholder="20" style={inp} onFocus={fo} onBlur={bl} />
+              <input
+                type="number"
+                value={text.age}
+                onChange={(e) => setField("age", e.target.value)}
+                placeholder="20"
+                style={inp} onFocus={fo} onBlur={bl}
+              />
             </div>
           </div>
 
@@ -250,7 +280,12 @@ export default function OnboardingPage() {
 
           <div>
             <label style={lbl}>Field of study / work <span style={{ color: "#ec4899" }}>*</span></label>
-            <input name="fieldOfStudy" placeholder="e.g. Computer Science, CA Foundation, UPSC" style={inp} onFocus={fo} onBlur={bl} />
+            <input
+              value={text.fieldOfStudy}
+              onChange={(e) => setField("fieldOfStudy", e.target.value)}
+              placeholder="e.g. Computer Science, CA Foundation, UPSC"
+              style={inp} onFocus={fo} onBlur={bl}
+            />
           </div>
         </div>
 
@@ -268,12 +303,11 @@ export default function OnboardingPage() {
             <label style={lbl}>Subjects you study <span style={{ color: "#ec4899" }}>*</span></label>
             <div style={{ display: "flex", gap: "0.5rem", marginBottom: "0.65rem" }}>
               <input
-                value={subjectInput}
-                onChange={(e) => setSubjectInput(e.target.value)}
+                value={text.subjectInput}
+                onChange={(e) => setField("subjectInput", e.target.value)}
                 onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); addSubject(); } }}
                 placeholder="Type a subject and press Enter or Add"
-                style={{ ...inp, flex: 1 }}
-                onFocus={fo} onBlur={bl}
+                style={{ ...inp, flex: 1 }} onFocus={fo} onBlur={bl}
               />
               <button type="button" onClick={addSubject} style={{
                 padding: "0.75rem 1.1rem", background: "#7c3aed", color: "#fff",
@@ -299,20 +333,26 @@ export default function OnboardingPage() {
 
           <div style={{ marginBottom: "1.25rem" }}>
             <label style={lbl}>Exam goals / targets <span style={{ color: "#ec4899" }}>*</span></label>
-            <textarea name="examGoals" rows={3}
-              placeholder="e.g. Score 90%+ in boards, crack JEE Mains, pass CA Inter in May 2025"
-              style={{ ...inp, resize: "vertical" }} onFocus={fo} onBlur={bl} />
+            <textarea
+              value={text.examGoals}
+              onChange={(e) => setField("examGoals", e.target.value)}
+              rows={3} placeholder="e.g. Score 90%+ in boards, crack JEE Mains, pass CA Inter in May 2025"
+              style={{ ...inp, resize: "vertical" }} onFocus={fo} onBlur={bl}
+            />
           </div>
 
           <div style={{ marginBottom: "1.25rem" }}>
             <label style={lbl}>Current performance <span style={{ color: "#ec4899" }}>*</span></label>
-            <textarea name="currentPerformance" rows={2}
-              placeholder="e.g. Scoring 65–70%, weak in Maths, decent in Chemistry"
-              style={{ ...inp, resize: "vertical" }} onFocus={fo} onBlur={bl} />
+            <textarea
+              value={text.currentPerformance}
+              onChange={(e) => setField("currentPerformance", e.target.value)}
+              rows={2} placeholder="e.g. Scoring 65–70%, weak in Maths, decent in Chemistry"
+              style={{ ...inp, resize: "vertical" }} onFocus={fo} onBlur={bl}
+            />
           </div>
 
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "1.25rem" }}>
-            <div style={{ marginBottom: "1.25rem" }}>
+            <div>
               <label style={lbl}>Hours available daily <span style={{ color: "#ec4899" }}>*</span></label>
               <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "0.4rem" }}>
                 <span style={{ color: "#555", fontSize: "0.75rem" }}>1</span>
@@ -322,7 +362,7 @@ export default function OnboardingPage() {
               <input type="range" min={1} max={14} value={dailyHours} onChange={(e) => setDailyHours(Number(e.target.value))}
                 style={{ width: "100%", accentColor: "#7c3aed", cursor: "pointer" }} />
             </div>
-            <div style={{ marginBottom: "1.25rem" }}>
+            <div>
               <label style={lbl}>Avg session length <span style={{ color: "#ec4899" }}>*</span></label>
               <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "0.4rem" }}>
                 <span style={{ color: "#555", fontSize: "0.75rem" }}>15</span>
@@ -347,9 +387,12 @@ export default function OnboardingPage() {
 
           <div style={{ marginBottom: "1.25rem" }}>
             <label style={lbl}>Current study method <span style={{ color: "#ec4899" }}>*</span></label>
-            <textarea name="currentStudyMethod" rows={2}
-              placeholder="e.g. Read NCERT + watch YouTube, make notes sometimes, revise day before exams"
-              style={{ ...inp, resize: "vertical" }} onFocus={fo} onBlur={bl} />
+            <textarea
+              value={text.currentStudyMethod}
+              onChange={(e) => setField("currentStudyMethod", e.target.value)}
+              rows={2} placeholder="e.g. Read NCERT + watch YouTube, make notes sometimes, revise day before exams"
+              style={{ ...inp, resize: "vertical" }} onFocus={fo} onBlur={bl}
+            />
           </div>
 
           <div style={{ marginBottom: "1.25rem" }}>
@@ -368,7 +411,7 @@ export default function OnboardingPage() {
           </div>
 
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "1.25rem" }}>
-            <div style={{ marginBottom: "1.25rem" }}>
+            <div>
               <label style={lbl}>Procrastination level <span style={{ color: "#ec4899" }}>*</span></label>
               <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "0.4rem" }}>
                 <span style={{ color: "#555", fontSize: "0.75rem" }}>1</span>
@@ -378,7 +421,7 @@ export default function OnboardingPage() {
               <input type="range" min={1} max={5} value={procrastination} onChange={(e) => setProcrastination(Number(e.target.value))}
                 style={{ width: "100%", accentColor: "#7c3aed", cursor: "pointer" }} />
             </div>
-            <div style={{ marginBottom: "1.25rem" }}>
+            <div>
               <label style={lbl}>Peak energy time <span style={{ color: "#ec4899" }}>*</span></label>
               <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "0.5rem" }}>
                 {ENERGY.map((o) => (
@@ -386,8 +429,7 @@ export default function OnboardingPage() {
                     padding: "0.6rem 0.5rem", borderRadius: "10px", cursor: "pointer",
                     border: `1px solid ${energyPeak === o.value ? "#7c3aed" : "#2a2a2a"}`,
                     background: energyPeak === o.value ? "rgba(124,58,237,0.15)" : "#141414",
-                    color: energyPeak === o.value ? "#fff" : "#888",
-                    fontSize: "0.72rem", textAlign: "left",
+                    color: energyPeak === o.value ? "#fff" : "#888", fontSize: "0.75rem", textAlign: "left",
                   }}>{o.emoji} {o.label}</button>
                 ))}
               </div>
@@ -502,9 +544,12 @@ export default function OnboardingPage() {
 
           <div style={{ marginBottom: "1.25rem" }}>
             <label style={lbl}>Primary goal (in your own words) <span style={{ color: "#ec4899" }}>*</span></label>
-            <textarea name="primaryGoal" rows={2}
-              placeholder="e.g. I want to stop wasting time and study consistently so I can crack NEET this year"
-              style={{ ...inp, resize: "vertical" }} onFocus={fo} onBlur={bl} />
+            <textarea
+              value={text.primaryGoal}
+              onChange={(e) => setField("primaryGoal", e.target.value)}
+              rows={2} placeholder="e.g. I want to stop wasting time and study consistently so I can crack NEET this year"
+              style={{ ...inp, resize: "vertical" }} onFocus={fo} onBlur={bl}
+            />
           </div>
 
           <div style={{ marginBottom: "1.25rem" }}>
@@ -526,9 +571,12 @@ export default function OnboardingPage() {
 
           <div style={{ marginBottom: "1.25rem" }}>
             <label style={lbl}>Previous systems you&apos;ve tried <span style={{ color: "#ec4899" }}>*</span></label>
-            <textarea name="previousSystemsTried" rows={2}
-              placeholder="e.g. Tried Pomodoro but kept skipping. Made timetables but never followed them."
-              style={{ ...inp, resize: "vertical" }} onFocus={fo} onBlur={bl} />
+            <textarea
+              value={text.previousSystemsTried}
+              onChange={(e) => setField("previousSystemsTried", e.target.value)}
+              rows={2} placeholder="e.g. Tried Pomodoro but kept skipping. Made timetables but never followed them."
+              style={{ ...inp, resize: "vertical" }} onFocus={fo} onBlur={bl}
+            />
           </div>
         </div>
 
