@@ -55,17 +55,14 @@ export async function POST(request: NextRequest) {
         };
 
         try {
-          // Step 1 — Diagnosis
           send({ step: "diagnosis", status: "active" });
           const diagnosis = await callClaude(buildDiagnosisPrompt(profile)) as Diagnosis;
           send({ step: "diagnosis", status: "complete" });
 
-          // Step 2 — Strategy
           send({ step: "strategy", status: "active" });
           const strategy = await callClaude(buildStrategyPrompt(profile, diagnosis)) as Strategy;
           send({ step: "strategy", status: "complete" });
 
-          // Step 3 — Schedule
           send({ step: "schedule", status: "active" });
           const schedule = await callClaude(buildSchedulePrompt(profile, strategy)) as {
             dailyRoutine: MasterPlan["dailyRoutine"];
@@ -73,7 +70,6 @@ export async function POST(request: NextRequest) {
           };
           send({ step: "schedule", status: "complete" });
 
-          // Step 4 — Systems
           send({ step: "systems", status: "active" });
           const systems = await callClaude(buildSystemsPrompt(profile, diagnosis, strategy)) as {
             habitSystem: MasterPlan["habitSystem"];
@@ -81,17 +77,14 @@ export async function POST(request: NextRequest) {
           };
           send({ step: "systems", status: "complete" });
 
-          // Step 5 — Resources
           send({ step: "resources", status: "active" });
           const resources = await callClaude(buildResourcesPrompt(profile)) as MasterPlan["resources"];
           send({ step: "resources", status: "complete" });
 
-          // Step 6 — Weekly Review
           send({ step: "review", status: "active" });
           const weeklyReview = await callClaude(buildWeeklyReviewPrompt(profile)) as MasterPlan["weeklyReview"];
           send({ step: "review", status: "complete" });
 
-          // Assemble master plan
           const masterPlan: MasterPlan = {
             diagnosis,
             strategy,
@@ -109,7 +102,6 @@ export async function POST(request: NextRequest) {
           };
 
           send({ step: "complete", status: "complete", plan: masterPlan });
-
         } catch (error) {
           send({
             step: "error",
@@ -129,7 +121,6 @@ export async function POST(request: NextRequest) {
         Connection: "keep-alive",
       },
     });
-
   } catch (error) {
     return NextResponse.json(
       { error: error instanceof Error ? error.message : "Internal server error" },
