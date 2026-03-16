@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { useAppStore } from "@/lib/store";
 import type {
@@ -73,21 +73,10 @@ export default function OnboardingPage() {
   const router = useRouter();
   const { setStudentProfile } = useAppStore();
 
-  // ── ALL text inputs are UNCONTROLLED (defaultValue + ref) ─────────────────
-  // This means React NEVER re-renders them. Values only read on submit.
-  const nameRef = useRef<HTMLInputElement>(null);
-  const ageRef = useRef<HTMLInputElement>(null);
-  const fieldRef = useRef<HTMLInputElement>(null);
-  const subjectRef = useRef<HTMLInputElement>(null);
-  const examGoalsRef = useRef<HTMLTextAreaElement>(null);
-  const performanceRef = useRef<HTMLTextAreaElement>(null);
-  const studyMethodRef = useRef<HTMLTextAreaElement>(null);
-  const primaryGoalRef = useRef<HTMLTextAreaElement>(null);
-  const prevSystemsRef = useRef<HTMLTextAreaElement>(null);
-
-  // ── Only interactive non-text fields use state ────────────────────────────
+  // Only state for interactive non-text fields
   const [eduLevel, setEduLevel] = useState<EducationLevel>("undergraduate");
   const [subjects, setSubjects] = useState<string[]>([]);
+  const [subjectInput, setSubjectInput] = useState("");
   const [dailyHours, setDailyHours] = useState(4);
   const [sessionLen, setSessionLen] = useState(45);
   const [distractions, setDistractions] = useState<string[]>([]);
@@ -101,49 +90,37 @@ export default function OnboardingPage() {
   const [burnout, setBurnout] = useState(false);
   const [socialMedia, setSocialMedia] = useState<string[]>([]);
   const [coachPersonality, setCoachPersonality] = useState<CoachPersonality>("supportive");
+  const [errors, setErrors] = useState<string[]>([]);
 
-  // ── Errors stored in ref — NO re-render, shown via DOM directly ───────────
-  const errorBoxRef = useRef<HTMLDivElement>(null);
-
-  const showErrors = (errs: string[]) => {
-    if (!errorBoxRef.current) return;
-    errorBoxRef.current.style.display = "block";
-    errorBoxRef.current.innerHTML = `
-      <p style="color:#f87171;font-weight:600;margin:0 0 0.5rem;font-size:0.875rem">Fix these before continuing:</p>
-      <ul style="margin:0;padding-left:1.25rem">
-        ${errs.map((e) => `<li style="color:#fca5a5;font-size:0.82rem;margin-bottom:0.2rem">${e}</li>`).join("")}
-      </ul>
-    `;
-    errorBoxRef.current.scrollIntoView({ behavior: "smooth", block: "center" });
-  };
-
-  const hideErrors = () => {
-    if (errorBoxRef.current) errorBoxRef.current.style.display = "none";
-  };
-
-  const toggleChip = (list: string[], setList: (v: string[]) => void, val: string) =>
+  const toggle = (list: string[], setList: (v: string[]) => void, val: string) =>
     setList(list.includes(val) ? list.filter((x) => x !== val) : [...list, val]);
 
   const addSubject = () => {
-    const v = subjectRef.current?.value.trim();
+    const v = subjectInput.trim();
     if (v && !subjects.includes(v)) {
-      setSubjects((prev) => [...prev, v]);
-      if (subjectRef.current) subjectRef.current.value = "";
+      setSubjects([...subjects, v]);
+      setSubjectInput("");
     }
   };
 
-  const handleSubmit = () => {
-    // Read all values from refs first — before anything else
-    const name = nameRef.current?.value.trim() ?? "";
-    const age = Number(ageRef.current?.value ?? "0");
-    const fieldOfStudy = fieldRef.current?.value.trim() ?? "";
-    const examGoals = examGoalsRef.current?.value.trim() ?? "";
-    const currentPerformance = performanceRef.current?.value.trim() ?? "";
-    const currentStudyMethod = studyMethodRef.current?.value.trim() ?? "";
-    const primaryGoal = primaryGoalRef.current?.value.trim() ?? "";
-    const previousSystemsTried = prevSystemsRef.current?.value.trim() ?? "";
+  // Read text values directly from DOM by name — bypasses React entirely
+  const getField = (name: string): string => {
+    if (typeof document === "undefined") return "";
+    const el = document.querySelector(`[name="${name}"]`) as HTMLInputElement | HTMLTextAreaElement | null;
+    return el?.value.trim() ?? "";
+  };
 
-    // Validate
+  const handleSubmit = () => {
+    // Read from DOM — React state changes cannot affect these
+    const name = getField("name");
+    const age = Number(getField("age")) || 0;
+    const fieldOfStudy = getField("fieldOfStudy");
+    const examGoals = getField("examGoals");
+    const currentPerformance = getField("currentPerformance");
+    const currentStudyMethod = getField("currentStudyMethod");
+    const primaryGoal = getField("primaryGoal");
+    const previousSystemsTried = getField("previousSystemsTried");
+
     const errs: string[] = [];
     if (!name) errs.push("Name is required");
     if (!age || age < 10 || age > 80) errs.push("Enter a valid age (10–80)");
@@ -157,20 +134,21 @@ export default function OnboardingPage() {
     if (!previousSystemsTried) errs.push("Previous systems tried is required");
 
     if (errs.length > 0) {
-      showErrors(errs);
-      return; // NO setState called — inputs stay intact
+      setErrors(errs);
+      setTimeout(() => {
+        document.getElementById("err")?.scrollIntoView({ behavior: "smooth", block: "center" });
+      }, 50);
+      return;
     }
 
-    hideErrors();
+    setErrors([]);
 
     const profile: StudentProfile = {
       name, age, fieldOfStudy, examGoals, currentPerformance,
       currentStudyMethod, primaryGoal, previousSystemsTried,
-      educationLevel: eduLevel,
-      subjects,
+      educationLevel: eduLevel, subjects,
       dailyStudyHoursAvailable: dailyHours,
-      wakeUpTime: wakeTime,
-      sleepTime,
+      wakeUpTime: wakeTime, sleepTime,
       averageSessionLength: sessionLen,
       biggestDistractions: distractions,
       procrastinationLevel: procrastination as ProcrastinationLevel,
@@ -187,29 +165,27 @@ export default function OnboardingPage() {
     router.push("/generating");
   };
 
-  const onFocus = (e: React.FocusEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) =>
+  const fo = (e: React.FocusEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) =>
     (e.currentTarget.style.borderColor = "#7c3aed");
-  const onBlur = (e: React.FocusEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) =>
+  const bl = (e: React.FocusEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) =>
     (e.currentTarget.style.borderColor = "#2a2a2a");
 
   return (
     <div style={{ minHeight: "100vh", background: "#0a0a0a", fontFamily: "'Inter', sans-serif", paddingBottom: "6rem" }}>
 
-      {/* Navbar */}
       <div style={{
         background: "rgba(10,10,10,0.95)", borderBottom: "1px solid #1a1a1a",
         padding: "0.9rem 2rem", position: "sticky", top: 0, zIndex: 100, backdropFilter: "blur(12px)",
       }}>
         <span style={{
           fontFamily: "'Playfair Display', serif", fontSize: "1.1rem", fontWeight: 900,
-          background: "linear-gradient(135deg, #a78bfa, #ec4899)",
+          background: "linear-gradient(135deg,#a78bfa,#ec4899)",
           WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent",
         }}>PeakMind</span>
       </div>
 
       <div style={{ maxWidth: "720px", margin: "0 auto", padding: "3rem 1.5rem 0" }}>
 
-        {/* Title */}
         <div style={{ textAlign: "center", marginBottom: "3rem" }}>
           <h1 style={{
             fontFamily: "'Playfair Display', serif", fontSize: "clamp(1.8rem,4vw,2.8rem)",
@@ -225,14 +201,19 @@ export default function OnboardingPage() {
           </p>
         </div>
 
-        {/* Error box — hidden by default, shown via DOM (no re-render) */}
-        <div ref={errorBoxRef} style={{
-          display: "none",
-          background: "rgba(239,68,68,0.08)", border: "1px solid rgba(239,68,68,0.3)",
-          borderRadius: "12px", padding: "1.25rem 1.5rem", marginBottom: "2rem",
-        }} />
+        {errors.length > 0 && (
+          <div id="err" style={{
+            background: "rgba(239,68,68,0.08)", border: "1px solid rgba(239,68,68,0.3)",
+            borderRadius: "12px", padding: "1.25rem 1.5rem", marginBottom: "2rem",
+          }}>
+            <p style={{ color: "#f87171", fontWeight: 600, margin: "0 0 0.5rem", fontSize: "0.875rem" }}>Fix these before continuing:</p>
+            <ul style={{ margin: 0, paddingLeft: "1.25rem" }}>
+              {errors.map((e) => <li key={e} style={{ color: "#fca5a5", fontSize: "0.82rem", marginBottom: "0.2rem" }}>{e}</li>)}
+            </ul>
+          </div>
+        )}
 
-        {/* ── Section 1 ── */}
+        {/* Section 1 */}
         <div style={sec}>
           <div style={{ marginBottom: "1.75rem" }}>
             <div style={{ display: "flex", alignItems: "center", gap: "0.75rem", marginBottom: "0.4rem" }}>
@@ -245,11 +226,11 @@ export default function OnboardingPage() {
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "1.25rem", marginBottom: "1.25rem" }}>
             <div>
               <label style={lbl}>Your name <span style={{ color: "#ec4899" }}>*</span></label>
-              <input ref={nameRef} defaultValue="" placeholder="e.g. Arjun" style={inp} onFocus={onFocus} onBlur={onBlur} />
+              <input name="name" placeholder="e.g. Arjun" style={inp} onFocus={fo} onBlur={bl} />
             </div>
             <div>
               <label style={lbl}>Age <span style={{ color: "#ec4899" }}>*</span></label>
-              <input ref={ageRef} type="number" defaultValue="" placeholder="20" style={inp} onFocus={onFocus} onBlur={onBlur} />
+              <input name="age" type="number" placeholder="20" style={inp} onFocus={fo} onBlur={bl} />
             </div>
           </div>
 
@@ -261,8 +242,7 @@ export default function OnboardingPage() {
                   padding: "0.9rem 1rem", borderRadius: "12px", textAlign: "left", cursor: "pointer",
                   border: `1px solid ${eduLevel === o.value ? "#7c3aed" : "#2a2a2a"}`,
                   background: eduLevel === o.value ? "rgba(124,58,237,0.15)" : "#141414",
-                  color: eduLevel === o.value ? "#fff" : "#888", transition: "all 0.15s",
-                  fontWeight: 600, fontSize: "0.85rem",
+                  color: eduLevel === o.value ? "#fff" : "#888", fontWeight: 600, fontSize: "0.85rem",
                 }}>{o.label}</button>
               ))}
             </div>
@@ -270,11 +250,11 @@ export default function OnboardingPage() {
 
           <div>
             <label style={lbl}>Field of study / work <span style={{ color: "#ec4899" }}>*</span></label>
-            <input ref={fieldRef} defaultValue="" placeholder="e.g. Computer Science, CA Foundation, UPSC" style={inp} onFocus={onFocus} onBlur={onBlur} />
+            <input name="fieldOfStudy" placeholder="e.g. Computer Science, CA Foundation, UPSC" style={inp} onFocus={fo} onBlur={bl} />
           </div>
         </div>
 
-        {/* ── Section 2 ── */}
+        {/* Section 2 */}
         <div style={sec}>
           <div style={{ marginBottom: "1.75rem" }}>
             <div style={{ display: "flex", alignItems: "center", gap: "0.75rem", marginBottom: "0.4rem" }}>
@@ -287,10 +267,14 @@ export default function OnboardingPage() {
           <div style={{ marginBottom: "1.25rem" }}>
             <label style={lbl}>Subjects you study <span style={{ color: "#ec4899" }}>*</span></label>
             <div style={{ display: "flex", gap: "0.5rem", marginBottom: "0.65rem" }}>
-              <input ref={subjectRef} defaultValue="" placeholder="Type a subject and press Enter or Add"
-                style={{ ...inp, flex: 1 }}
+              <input
+                value={subjectInput}
+                onChange={(e) => setSubjectInput(e.target.value)}
                 onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); addSubject(); } }}
-                onFocus={onFocus} onBlur={onBlur} />
+                placeholder="Type a subject and press Enter or Add"
+                style={{ ...inp, flex: 1 }}
+                onFocus={fo} onBlur={bl}
+              />
               <button type="button" onClick={addSubject} style={{
                 padding: "0.75rem 1.1rem", background: "#7c3aed", color: "#fff",
                 border: "none", borderRadius: "10px", cursor: "pointer", fontWeight: 600, fontSize: "0.85rem", whiteSpace: "nowrap",
@@ -315,16 +299,16 @@ export default function OnboardingPage() {
 
           <div style={{ marginBottom: "1.25rem" }}>
             <label style={lbl}>Exam goals / targets <span style={{ color: "#ec4899" }}>*</span></label>
-            <textarea ref={examGoalsRef} defaultValue="" rows={3}
+            <textarea name="examGoals" rows={3}
               placeholder="e.g. Score 90%+ in boards, crack JEE Mains, pass CA Inter in May 2025"
-              style={{ ...inp, resize: "vertical" }} onFocus={onFocus} onBlur={onBlur} />
+              style={{ ...inp, resize: "vertical" }} onFocus={fo} onBlur={bl} />
           </div>
 
           <div style={{ marginBottom: "1.25rem" }}>
             <label style={lbl}>Current performance <span style={{ color: "#ec4899" }}>*</span></label>
-            <textarea ref={performanceRef} defaultValue="" rows={2}
+            <textarea name="currentPerformance" rows={2}
               placeholder="e.g. Scoring 65–70%, weak in Maths, decent in Chemistry"
-              style={{ ...inp, resize: "vertical" }} onFocus={onFocus} onBlur={onBlur} />
+              style={{ ...inp, resize: "vertical" }} onFocus={fo} onBlur={bl} />
           </div>
 
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "1.25rem" }}>
@@ -351,7 +335,7 @@ export default function OnboardingPage() {
           </div>
         </div>
 
-        {/* ── Section 3 ── */}
+        {/* Section 3 */}
         <div style={sec}>
           <div style={{ marginBottom: "1.75rem" }}>
             <div style={{ display: "flex", alignItems: "center", gap: "0.75rem", marginBottom: "0.4rem" }}>
@@ -363,21 +347,21 @@ export default function OnboardingPage() {
 
           <div style={{ marginBottom: "1.25rem" }}>
             <label style={lbl}>Current study method <span style={{ color: "#ec4899" }}>*</span></label>
-            <textarea ref={studyMethodRef} defaultValue="" rows={2}
+            <textarea name="currentStudyMethod" rows={2}
               placeholder="e.g. Read NCERT + watch YouTube, make notes sometimes, revise day before exams"
-              style={{ ...inp, resize: "vertical" }} onFocus={onFocus} onBlur={onBlur} />
+              style={{ ...inp, resize: "vertical" }} onFocus={fo} onBlur={bl} />
           </div>
 
           <div style={{ marginBottom: "1.25rem" }}>
             <label style={lbl}>Biggest distractions <span style={{ color: "#ec4899" }}>*</span></label>
             <div style={{ display: "flex", flexWrap: "wrap", gap: "0.5rem" }}>
               {DISTRACTIONS.map((o) => (
-                <button key={o} type="button" onClick={() => toggleChip(distractions, setDistractions, o)} style={{
+                <button key={o} type="button" onClick={() => toggle(distractions, setDistractions, o)} style={{
                   padding: "0.35rem 0.85rem", borderRadius: "999px", cursor: "pointer", fontSize: "0.8rem",
                   border: `1px solid ${distractions.includes(o) ? "#7c3aed" : "#2a2a2a"}`,
                   background: distractions.includes(o) ? "rgba(124,58,237,0.2)" : "#1a1a1a",
                   color: distractions.includes(o) ? "#a78bfa" : "#777",
-                  fontWeight: distractions.includes(o) ? 600 : 400, transition: "all 0.15s",
+                  fontWeight: distractions.includes(o) ? 600 : 400,
                 }}>{o}</button>
               ))}
             </div>
@@ -402,18 +386,16 @@ export default function OnboardingPage() {
                     padding: "0.6rem 0.5rem", borderRadius: "10px", cursor: "pointer",
                     border: `1px solid ${energyPeak === o.value ? "#7c3aed" : "#2a2a2a"}`,
                     background: energyPeak === o.value ? "rgba(124,58,237,0.15)" : "#141414",
-                    color: energyPeak === o.value ? "#fff" : "#888", transition: "all 0.15s",
+                    color: energyPeak === o.value ? "#fff" : "#888",
                     fontSize: "0.72rem", textAlign: "left",
-                  }}>
-                    {o.emoji} {o.label}
-                  </button>
+                  }}>{o.emoji} {o.label}</button>
                 ))}
               </div>
             </div>
           </div>
         </div>
 
-        {/* ── Section 4 ── */}
+        {/* Section 4 */}
         <div style={sec}>
           <div style={{ marginBottom: "1.75rem" }}>
             <div style={{ display: "flex", alignItems: "center", gap: "0.75rem", marginBottom: "0.4rem" }}>
@@ -425,16 +407,16 @@ export default function OnboardingPage() {
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "1.25rem" }}>
             <div>
               <label style={lbl}>Wake-up time <span style={{ color: "#ec4899" }}>*</span></label>
-              <input type="time" value={wakeTime} onChange={(e) => setWakeTime(e.target.value)} style={inp} onFocus={onFocus} onBlur={onBlur} />
+              <input type="time" value={wakeTime} onChange={(e) => setWakeTime(e.target.value)} style={inp} onFocus={fo} onBlur={bl} />
             </div>
             <div>
               <label style={lbl}>Sleep time <span style={{ color: "#ec4899" }}>*</span></label>
-              <input type="time" value={sleepTime} onChange={(e) => setSleepTime(e.target.value)} style={inp} onFocus={onFocus} onBlur={onBlur} />
+              <input type="time" value={sleepTime} onChange={(e) => setSleepTime(e.target.value)} style={inp} onFocus={fo} onBlur={bl} />
             </div>
           </div>
         </div>
 
-        {/* ── Section 5 ── */}
+        {/* Section 5 */}
         <div style={sec}>
           <div style={{ marginBottom: "1.75rem" }}>
             <div style={{ display: "flex", alignItems: "center", gap: "0.75rem", marginBottom: "0.4rem" }}>
@@ -461,7 +443,7 @@ export default function OnboardingPage() {
                 ...inp, cursor: "pointer",
                 backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%23a0a0a0' d='M6 8L1 3h10z'/%3E%3C/svg%3E")`,
                 backgroundRepeat: "no-repeat", backgroundPosition: "right 1rem center", backgroundSize: "12px", paddingRight: "2.5rem",
-              }} onFocus={onFocus} onBlur={onBlur}>
+              }} onFocus={fo} onBlur={bl}>
                 {EXERCISE.map((o) => <option key={o.value} value={o.value} style={{ background: "#1a1a1a" }}>{o.label}</option>)}
               </select>
             </div>
@@ -469,7 +451,7 @@ export default function OnboardingPage() {
 
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "1.25rem" }}>
             <div style={{ marginBottom: "1.25rem" }}>
-              <label style={lbl}>Screen time/day (non-study) <span style={{ color: "#ec4899" }}>*</span></label>
+              <label style={lbl}>Screen time/day (non-study)</label>
               <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "0.4rem" }}>
                 <span style={{ color: "#555", fontSize: "0.75rem" }}>0</span>
                 <span style={{ color: "#a78bfa", fontWeight: 700, fontSize: "0.9rem" }}>{screenTime} hrs</span>
@@ -496,19 +478,19 @@ export default function OnboardingPage() {
             <label style={lbl}>Social media apps you use</label>
             <div style={{ display: "flex", flexWrap: "wrap", gap: "0.5rem" }}>
               {SOCIAL.map((o) => (
-                <button key={o} type="button" onClick={() => toggleChip(socialMedia, setSocialMedia, o)} style={{
+                <button key={o} type="button" onClick={() => toggle(socialMedia, setSocialMedia, o)} style={{
                   padding: "0.35rem 0.85rem", borderRadius: "999px", cursor: "pointer", fontSize: "0.8rem",
                   border: `1px solid ${socialMedia.includes(o) ? "#7c3aed" : "#2a2a2a"}`,
                   background: socialMedia.includes(o) ? "rgba(124,58,237,0.2)" : "#1a1a1a",
                   color: socialMedia.includes(o) ? "#a78bfa" : "#777",
-                  fontWeight: socialMedia.includes(o) ? 600 : 400, transition: "all 0.15s",
+                  fontWeight: socialMedia.includes(o) ? 600 : 400,
                 }}>{o}</button>
               ))}
             </div>
           </div>
         </div>
 
-        {/* ── Section 6 ── */}
+        {/* Section 6 */}
         <div style={sec}>
           <div style={{ marginBottom: "1.75rem" }}>
             <div style={{ display: "flex", alignItems: "center", gap: "0.75rem", marginBottom: "0.4rem" }}>
@@ -520,9 +502,9 @@ export default function OnboardingPage() {
 
           <div style={{ marginBottom: "1.25rem" }}>
             <label style={lbl}>Primary goal (in your own words) <span style={{ color: "#ec4899" }}>*</span></label>
-            <textarea ref={primaryGoalRef} defaultValue="" rows={2}
+            <textarea name="primaryGoal" rows={2}
               placeholder="e.g. I want to stop wasting time and study consistently so I can crack NEET this year"
-              style={{ ...inp, resize: "vertical" }} onFocus={onFocus} onBlur={onBlur} />
+              style={{ ...inp, resize: "vertical" }} onFocus={fo} onBlur={bl} />
           </div>
 
           <div style={{ marginBottom: "1.25rem" }}>
@@ -533,7 +515,7 @@ export default function OnboardingPage() {
                   padding: "0.9rem 1rem", borderRadius: "12px", textAlign: "left", cursor: "pointer",
                   border: `1px solid ${coachPersonality === o.value ? "#7c3aed" : "#2a2a2a"}`,
                   background: coachPersonality === o.value ? "rgba(124,58,237,0.15)" : "#141414",
-                  color: coachPersonality === o.value ? "#fff" : "#888", transition: "all 0.15s",
+                  color: coachPersonality === o.value ? "#fff" : "#888",
                 }}>
                   <div style={{ fontWeight: 600, fontSize: "0.85rem", marginBottom: "0.2rem" }}>{o.label}</div>
                   <div style={{ fontSize: "0.75rem", color: "#666", lineHeight: 1.4 }}>{o.desc}</div>
@@ -544,9 +526,9 @@ export default function OnboardingPage() {
 
           <div style={{ marginBottom: "1.25rem" }}>
             <label style={lbl}>Previous systems you&apos;ve tried <span style={{ color: "#ec4899" }}>*</span></label>
-            <textarea ref={prevSystemsRef} defaultValue="" rows={2}
+            <textarea name="previousSystemsTried" rows={2}
               placeholder="e.g. Tried Pomodoro but kept skipping. Made timetables but never followed them."
-              style={{ ...inp, resize: "vertical" }} onFocus={onFocus} onBlur={onBlur} />
+              style={{ ...inp, resize: "vertical" }} onFocus={fo} onBlur={bl} />
           </div>
         </div>
 
@@ -556,7 +538,7 @@ export default function OnboardingPage() {
             padding: "1rem 3rem", background: "linear-gradient(135deg,#7c3aed,#ec4899)",
             color: "#fff", border: "none", borderRadius: "12px", fontSize: "1rem",
             fontWeight: 700, cursor: "pointer", letterSpacing: "0.04em",
-            boxShadow: "0 0 40px rgba(124,58,237,0.4)", transition: "transform 0.15s,box-shadow 0.15s",
+            boxShadow: "0 0 40px rgba(124,58,237,0.4)",
           }}
             onMouseEnter={(e) => { (e.currentTarget).style.transform = "translateY(-2px)"; (e.currentTarget).style.boxShadow = "0 0 60px rgba(124,58,237,0.6)"; }}
             onMouseLeave={(e) => { (e.currentTarget).style.transform = "translateY(0)"; (e.currentTarget).style.boxShadow = "0 0 40px rgba(124,58,237,0.4)"; }}
