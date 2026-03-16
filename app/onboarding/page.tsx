@@ -13,26 +13,6 @@ import type {
   StressLevel,
 } from "@/lib/types";
 
-const DRAFT_KEY = "peakmind_onboarding_draft";
-
-// ── Load saved draft from localStorage ───────────────────────────────────────
-function loadDraft(): Partial<StudentProfile> {
-  if (typeof window === "undefined") return {};
-  try {
-    const raw = localStorage.getItem(DRAFT_KEY);
-    return raw ? JSON.parse(raw) : {};
-  } catch {
-    return {};
-  }
-}
-
-function saveDraft(data: Partial<StudentProfile>) {
-  try {
-    localStorage.setItem(DRAFT_KEY, JSON.stringify(data));
-  } catch { /* ignore */ }
-}
-
-// ── Static option lists ───────────────────────────────────────────────────────
 const EDU_OPTIONS: { value: EducationLevel; label: string }[] = [
   { value: "high_school", label: "High School" },
   { value: "undergraduate", label: "Undergraduate" },
@@ -72,7 +52,6 @@ const SOCIAL_MEDIA = [
   "Snapchat", "TikTok", "Discord", "WhatsApp", "Telegram",
 ];
 
-// ── Validation ────────────────────────────────────────────────────────────────
 function validate(p: Partial<StudentProfile>): string[] {
   const e: string[] = [];
   if (!p.name?.trim()) e.push("Name is required");
@@ -88,42 +67,22 @@ function validate(p: Partial<StudentProfile>): string[] {
   return e;
 }
 
-// ── Styles ────────────────────────────────────────────────────────────────────
-const inputStyle: React.CSSProperties = {
+const inp: React.CSSProperties = {
   width: "100%", background: "#1a1a1a", border: "1px solid #2a2a2a",
-  borderRadius: "10px", padding: "0.75rem 1rem", color: "#ffffff",
+  borderRadius: "10px", padding: "0.75rem 1rem", color: "#fff",
   fontSize: "0.9rem", outline: "none", boxSizing: "border-box", fontFamily: "inherit",
 };
 
-const cardStyle: React.CSSProperties = {
-  background: "#111111", border: "1px solid #1e1e1e",
+const sec: React.CSSProperties = {
+  background: "#111", border: "1px solid #1e1e1e",
   borderRadius: "16px", padding: "2rem", marginBottom: "1.5rem",
 };
 
-// ── Main Component ────────────────────────────────────────────────────────────
 export default function OnboardingPage() {
   const router = useRouter();
   const { setStudentProfile } = useAppStore();
-  const draft = loadDraft();
 
-  // Non-text fields stored in state (instant interaction, no typing)
-  const [educationLevel, setEducationLevel] = useState<EducationLevel>(draft.educationLevel ?? "undergraduate");
-  const [subjects, setSubjects] = useState<string[]>(draft.subjects ?? []);
-  const [dailyStudyHours, setDailyStudyHours] = useState(draft.dailyStudyHoursAvailable ?? 4);
-  const [sessionLength, setSessionLength] = useState(draft.averageSessionLength ?? 45);
-  const [distractions, setDistractions] = useState<string[]>(draft.biggestDistractions ?? []);
-  const [procrastination, setProcrastination] = useState<number>(draft.procrastinationLevel ?? 3);
-  const [energyPeak, setEnergyPeak] = useState<EnergyPeakTime>(draft.energyPeakTime ?? "morning");
-  const [wakeTime, setWakeTime] = useState(draft.wakeUpTime ?? "07:00");
-  const [sleepTime, setSleepTime] = useState(draft.sleepTime ?? "23:00");
-  const [stress, setStress] = useState<number>(draft.stressLevel ?? 3);
-  const [exercise, setExercise] = useState<ExerciseFrequency>(draft.exerciseFrequency ?? "rarely");
-  const [screenTime, setScreenTime] = useState(draft.screenTimePerDay ?? 4);
-  const [burnout, setBurnout] = useState(draft.burnoutSymptoms ?? false);
-  const [socialMedia, setSocialMedia] = useState<string[]>(draft.socialMediaApps ?? []);
-  const [coachPersonality, setCoachPersonality] = useState<CoachPersonality>(draft.coachPersonality ?? "supportive");
-
-  // Text fields use REFS — completely uncontrolled, no re-renders while typing
+  // ── Refs for all text inputs (no re-render on keystroke) ──────────────────
   const nameRef = useRef<HTMLInputElement>(null);
   const ageRef = useRef<HTMLInputElement>(null);
   const fieldRef = useRef<HTMLInputElement>(null);
@@ -131,63 +90,55 @@ export default function OnboardingPage() {
   const performanceRef = useRef<HTMLTextAreaElement>(null);
   const studyMethodRef = useRef<HTMLTextAreaElement>(null);
   const primaryGoalRef = useRef<HTMLTextAreaElement>(null);
-  const previousSystemsRef = useRef<HTMLTextAreaElement>(null);
+  const prevSystemsRef = useRef<HTMLTextAreaElement>(null);
   const subjectInputRef = useRef<HTMLInputElement>(null);
+
+  // ── State only for interactive non-text fields ────────────────────────────
+  const [eduLevel, setEduLevel] = useState<EducationLevel>("undergraduate");
+  const [subjects, setSubjects] = useState<string[]>([]);
+  const [dailyHours, setDailyHours] = useState(4);
+  const [sessionLen, setSessionLen] = useState(45);
+  const [distractions, setDistractions] = useState<string[]>([]);
+  const [procrastination, setProcrastination] = useState(3);
+  const [energyPeak, setEnergyPeak] = useState<EnergyPeakTime>("morning");
+  const [wakeTime, setWakeTime] = useState("07:00");
+  const [sleepTime, setSleepTime] = useState("23:00");
+  const [stress, setStress] = useState(3);
+  const [exercise, setExercise] = useState<ExerciseFrequency>("rarely");
+  const [screenTime, setScreenTime] = useState(4);
+  const [burnout, setBurnout] = useState(false);
+  const [socialMedia, setSocialMedia] = useState<string[]>([]);
+  const [coachPersonality, setCoachPersonality] = useState<CoachPersonality>("supportive");
 
   const [errors, setErrors] = useState<string[]>([]);
   const [submitted, setSubmitted] = useState(false);
-  const [saveStatus, setSaveStatus] = useState("");
 
-  // Save non-text fields to draft whenever they change
-  const updateDraft = (patch: Partial<StudentProfile>) => {
-    const current = loadDraft();
-    saveDraft({ ...current, ...patch });
-    setSaveStatus("saved");
-    setTimeout(() => setSaveStatus(""), 2000);
-  };
-
-  const toggleItem = (
-    list: string[],
-    setList: (v: string[]) => void,
-    field: keyof StudentProfile,
-    value: string
-  ) => {
-    const next = list.includes(value) ? list.filter((x) => x !== value) : [...list, value];
-    setList(next);
-    updateDraft({ [field]: next } as Partial<StudentProfile>);
+  const toggleChip = (list: string[], setList: (v: string[]) => void, val: string) => {
+    setList(list.includes(val) ? list.filter((x) => x !== val) : [...list, val]);
   };
 
   const addSubject = () => {
     const val = subjectInputRef.current?.value.trim();
     if (val && !subjects.includes(val)) {
-      const next = [...subjects, val];
-      setSubjects(next);
-      updateDraft({ subjects: next });
+      setSubjects([...subjects, val]);
       if (subjectInputRef.current) subjectInputRef.current.value = "";
     }
   };
 
-  const removeSubject = (s: string) => {
-    const next = subjects.filter((x) => x !== s);
-    setSubjects(next);
-    updateDraft({ subjects: next });
-  };
-
-  // Collect everything and submit
   const handleSubmit = () => {
     const profile: Partial<StudentProfile> = {
       name: nameRef.current?.value.trim() ?? "",
       age: Number(ageRef.current?.value) || 0,
-      educationLevel,
+      educationLevel: eduLevel,
       fieldOfStudy: fieldRef.current?.value.trim() ?? "",
       subjects,
       examGoals: examGoalsRef.current?.value.trim() ?? "",
-      dailyStudyHoursAvailable: dailyStudyHours,
+      dailyStudyHoursAvailable: dailyHours,
       currentPerformance: performanceRef.current?.value.trim() ?? "",
       wakeUpTime: wakeTime,
       sleepTime,
       currentStudyMethod: studyMethodRef.current?.value.trim() ?? "",
-      averageSessionLength: sessionLength,
+      averageSessionLength: sessionLen,
       biggestDistractions: distractions,
       procrastinationLevel: procrastination as ProcrastinationLevel,
       energyPeakTime: energyPeak,
@@ -198,7 +149,7 @@ export default function OnboardingPage() {
       socialMediaApps: socialMedia,
       primaryGoal: primaryGoalRef.current?.value.trim() ?? "",
       coachPersonality,
-      previousSystemsTried: previousSystemsRef.current?.value.trim() ?? "",
+      previousSystemsTried: prevSystemsRef.current?.value.trim() ?? "",
     };
 
     setSubmitted(true);
@@ -208,15 +159,13 @@ export default function OnboardingPage() {
       document.getElementById("error-box")?.scrollIntoView({ behavior: "smooth", block: "center" });
       return;
     }
-
     setStudentProfile(profile as StudentProfile);
-    localStorage.removeItem(DRAFT_KEY);
     router.push("/generating");
   };
 
-  // ── Sub-components (no state, no hooks — safe inside render) ─────────────────
+  // ── Tiny inner components (no hooks, safe here) ───────────────────────────
 
-  const SectionHeader = ({ n, title, sub }: { n: string; title: string; sub: string }) => (
+  const Hdr = ({ n, title, sub }: { n: string; title: string; sub: string }) => (
     <div style={{ marginBottom: "1.75rem" }}>
       <div style={{ display: "flex", alignItems: "center", gap: "0.75rem", marginBottom: "0.4rem" }}>
         <span style={{
@@ -231,15 +180,11 @@ export default function OnboardingPage() {
     </div>
   );
 
-  const Label = ({ text }: { text: string }) => (
-    <label style={{ display: "block", color: "#c0c0c0", fontSize: "0.82rem", fontWeight: 600, marginBottom: "0.5rem" }}>
-      {text} <span style={{ color: "#ec4899" }}>*</span>
-    </label>
-  );
-
   const F = ({ label, children }: { label: string; children: React.ReactNode }) => (
     <div style={{ marginBottom: "1.25rem" }}>
-      <Label text={label} />
+      <label style={{ display: "block", color: "#c0c0c0", fontSize: "0.82rem", fontWeight: 600, marginBottom: "0.5rem" }}>
+        {label} <span style={{ color: "#ec4899" }}>*</span>
+      </label>
       {children}
     </div>
   );
@@ -248,85 +193,70 @@ export default function OnboardingPage() {
     <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "1.25rem" }}>{children}</div>
   );
 
-  const CardPicker = <T extends string>({
-    options, value, onChange,
-  }: {
-    options: { value: T; label: string; desc?: string; emoji?: string }[];
-    value: T;
-    onChange: (v: T) => void;
+  const Cards = <T extends string>({ opts, val, set }: {
+    opts: { value: T; label: string; desc?: string; emoji?: string }[]; val: T; set: (v: T) => void;
   }) => (
     <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(155px, 1fr))", gap: "0.65rem" }}>
-      {options.map((o) => {
-        const sel = value === o.value;
-        return (
-          <button key={o.value} type="button" onClick={() => onChange(o.value)} style={{
-            padding: "0.9rem 1rem", borderRadius: "12px", textAlign: "left", cursor: "pointer",
-            border: `1px solid ${sel ? "#7c3aed" : "#2a2a2a"}`,
-            background: sel ? "rgba(124,58,237,0.15)" : "#141414",
-            color: sel ? "#fff" : "#888", transition: "all 0.15s",
-          }}>
-            {o.emoji && <div style={{ fontSize: "1.2rem", marginBottom: "0.3rem" }}>{o.emoji}</div>}
-            <div style={{ fontWeight: 600, fontSize: "0.85rem", marginBottom: o.desc ? "0.2rem" : 0 }}>{o.label}</div>
-            {o.desc && <div style={{ fontSize: "0.75rem", color: "#666", lineHeight: 1.4 }}>{o.desc}</div>}
-          </button>
-        );
-      })}
+      {opts.map((o) => (
+        <button key={o.value} type="button" onClick={() => set(o.value)} style={{
+          padding: "0.9rem 1rem", borderRadius: "12px", textAlign: "left", cursor: "pointer",
+          border: `1px solid ${val === o.value ? "#7c3aed" : "#2a2a2a"}`,
+          background: val === o.value ? "rgba(124,58,237,0.15)" : "#141414",
+          color: val === o.value ? "#fff" : "#888", transition: "all 0.15s",
+        }}>
+          {o.emoji && <div style={{ fontSize: "1.2rem", marginBottom: "0.3rem" }}>{o.emoji}</div>}
+          <div style={{ fontWeight: 600, fontSize: "0.85rem", marginBottom: o.desc ? "0.2rem" : 0 }}>{o.label}</div>
+          {o.desc && <div style={{ fontSize: "0.75rem", color: "#666", lineHeight: 1.4 }}>{o.desc}</div>}
+        </button>
+      ))}
     </div>
   );
 
-  const ChipPicker = ({ options, selected, onToggle }: {
-    options: string[]; selected: string[]; onToggle: (v: string) => void;
-  }) => (
+  const Chips = ({ opts, sel, toggle }: { opts: string[]; sel: string[]; toggle: (v: string) => void }) => (
     <div style={{ display: "flex", flexWrap: "wrap", gap: "0.5rem" }}>
-      {options.map((o) => {
-        const sel = selected.includes(o);
-        return (
-          <button key={o} type="button" onClick={() => onToggle(o)} style={{
-            padding: "0.35rem 0.85rem", borderRadius: "999px", cursor: "pointer",
-            border: `1px solid ${sel ? "#7c3aed" : "#2a2a2a"}`,
-            background: sel ? "rgba(124,58,237,0.2)" : "#1a1a1a",
-            color: sel ? "#a78bfa" : "#777", fontSize: "0.8rem",
-            fontWeight: sel ? 600 : 400, transition: "all 0.15s",
-          }}>{o}</button>
-        );
-      })}
+      {opts.map((o) => (
+        <button key={o} type="button" onClick={() => toggle(o)} style={{
+          padding: "0.35rem 0.85rem", borderRadius: "999px", cursor: "pointer", fontSize: "0.8rem",
+          border: `1px solid ${sel.includes(o) ? "#7c3aed" : "#2a2a2a"}`,
+          background: sel.includes(o) ? "rgba(124,58,237,0.2)" : "#1a1a1a",
+          color: sel.includes(o) ? "#a78bfa" : "#777",
+          fontWeight: sel.includes(o) ? 600 : 400, transition: "all 0.15s",
+        }}>{o}</button>
+      ))}
     </div>
   );
 
-  const Slider = ({ value, onChange, min, max, label }: {
-    value: number; onChange: (v: number) => void; min: number; max: number; label: (v: number) => string;
+  const Slider = ({ val, set, min, max, fmt }: {
+    val: number; set: (v: number) => void; min: number; max: number; fmt: (v: number) => string;
   }) => (
     <div>
       <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "0.4rem" }}>
         <span style={{ color: "#555", fontSize: "0.75rem" }}>{min}</span>
-        <span style={{ color: "#a78bfa", fontWeight: 700, fontSize: "0.9rem" }}>{label(value)}</span>
+        <span style={{ color: "#a78bfa", fontWeight: 700, fontSize: "0.9rem" }}>{fmt(val)}</span>
         <span style={{ color: "#555", fontSize: "0.75rem" }}>{max}</span>
       </div>
-      <input type="range" min={min} max={max} value={value}
-        onChange={(e) => onChange(Number(e.target.value))}
-        style={{ width: "100%", accentColor: "#7c3aed", cursor: "pointer" }}
-      />
+      <input type="range" min={min} max={max} value={val} onChange={(e) => set(Number(e.target.value))}
+        style={{ width: "100%", accentColor: "#7c3aed", cursor: "pointer" }} />
     </div>
   );
 
-  // ── Render ────────────────────────────────────────────────────────────────────
+  const focus = (e: React.FocusEvent<HTMLInputElement | HTMLTextAreaElement>) => (e.currentTarget.style.borderColor = "#7c3aed");
+  const blur = (e: React.FocusEvent<HTMLInputElement | HTMLTextAreaElement>) => (e.currentTarget.style.borderColor = "#2a2a2a");
+
+  // ── Render ────────────────────────────────────────────────────────────────
   return (
     <div style={{ minHeight: "100vh", background: "#0a0a0a", fontFamily: "'Inter', sans-serif", paddingBottom: "6rem" }}>
 
       {/* Header */}
       <div style={{
         background: "rgba(10,10,10,0.9)", borderBottom: "1px solid #1a1a1a", padding: "0.9rem 2rem",
-        position: "sticky", top: 0, zIndex: 100, display: "flex", justifyContent: "space-between",
-        alignItems: "center", backdropFilter: "blur(12px)",
+        position: "sticky", top: 0, zIndex: 100, backdropFilter: "blur(12px)",
       }}>
         <span style={{
           fontFamily: "'Playfair Display', serif", fontSize: "1.1rem", fontWeight: 900,
           background: "linear-gradient(135deg, #a78bfa, #ec4899)",
           WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent",
         }}>PeakMind</span>
-        <span style={{ fontSize: "0.75rem", color: saveStatus ? "#4ade80" : "#444" }}>
-          {saveStatus ? "✓ Draft saved" : "Saves when you change options"}
-        </span>
       </div>
 
       <div style={{ maxWidth: "720px", margin: "0 auto", padding: "3rem 1.5rem 0" }}>
@@ -360,41 +290,35 @@ export default function OnboardingPage() {
           </div>
         )}
 
-        {/* ── Section 1 ── */}
-        <div style={cardStyle}>
-          <SectionHeader n="1" title="About You" sub="Basic identity — who you are and where you are in life." />
+        {/* Section 1 */}
+        <div style={sec}>
+          <Hdr n="1" title="About You" sub="Basic identity — who you are and where you are in life." />
           <Row>
             <F label="Your name">
-              <input ref={nameRef} defaultValue={draft.name ?? ""} placeholder="e.g. Arjun" style={inputStyle}
-                onFocus={(e) => (e.currentTarget.style.borderColor = "#7c3aed")}
-                onBlur={(e) => (e.currentTarget.style.borderColor = "#2a2a2a")} />
+              <input ref={nameRef} placeholder="e.g. Arjun" style={inp} onFocus={focus} onBlur={blur} />
             </F>
             <F label="Age">
-              <input ref={ageRef} type="number" defaultValue={draft.age ?? 18} placeholder="18" style={inputStyle}
-                onFocus={(e) => (e.currentTarget.style.borderColor = "#7c3aed")}
-                onBlur={(e) => (e.currentTarget.style.borderColor = "#2a2a2a")} />
+              <input ref={ageRef} type="number" placeholder="18" style={inp} onFocus={focus} onBlur={blur} />
             </F>
           </Row>
           <F label="Education level">
-            <CardPicker options={EDU_OPTIONS} value={educationLevel} onChange={(v) => { setEducationLevel(v); updateDraft({ educationLevel: v }); }} />
+            <Cards opts={EDU_OPTIONS} val={eduLevel} set={setEduLevel} />
           </F>
           <F label="Field of study / work">
-            <input ref={fieldRef} defaultValue={draft.fieldOfStudy ?? ""} placeholder="e.g. Computer Science, CA Foundation, UPSC" style={inputStyle}
-              onFocus={(e) => (e.currentTarget.style.borderColor = "#7c3aed")}
-              onBlur={(e) => (e.currentTarget.style.borderColor = "#2a2a2a")} />
+            <input ref={fieldRef} placeholder="e.g. Computer Science, CA Foundation, UPSC" style={inp} onFocus={focus} onBlur={blur} />
           </F>
         </div>
 
-        {/* ── Section 2 ── */}
-        <div style={cardStyle}>
-          <SectionHeader n="2" title="Academic Profile" sub="What you're studying and where you stand right now." />
+        {/* Section 2 */}
+        <div style={sec}>
+          <Hdr n="2" title="Academic Profile" sub="What you're studying and where you stand right now." />
 
           <F label="Subjects you study">
             <div style={{ display: "flex", gap: "0.5rem", marginBottom: "0.65rem" }}>
-              <input ref={subjectInputRef} placeholder="Type a subject and press Enter or Add" style={{ ...inputStyle, flex: 1 }}
+              <input ref={subjectInputRef} placeholder="Type a subject and press Enter or Add"
+                style={{ ...inp, flex: 1 }}
                 onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); addSubject(); } }}
-                onFocus={(e) => (e.currentTarget.style.borderColor = "#7c3aed")}
-                onBlur={(e) => (e.currentTarget.style.borderColor = "#2a2a2a")} />
+                onFocus={focus} onBlur={blur} />
               <button type="button" onClick={addSubject} style={{
                 padding: "0.75rem 1.1rem", background: "#7c3aed", color: "#fff",
                 border: "none", borderRadius: "10px", cursor: "pointer", fontWeight: 600, fontSize: "0.85rem", whiteSpace: "nowrap",
@@ -409,7 +333,7 @@ export default function OnboardingPage() {
                     display: "flex", alignItems: "center", gap: "0.35rem",
                   }}>
                     {s}
-                    <button type="button" onClick={() => removeSubject(s)}
+                    <button type="button" onClick={() => setSubjects(subjects.filter((x) => x !== s))}
                       style={{ background: "none", border: "none", color: "#ec4899", cursor: "pointer", padding: 0, fontSize: "1rem", lineHeight: 1 }}>×</button>
                   </span>
                 ))}
@@ -418,101 +342,80 @@ export default function OnboardingPage() {
           </F>
 
           <F label="Exam goals / targets">
-            <textarea ref={examGoalsRef} defaultValue={draft.examGoals ?? ""} rows={3}
-              placeholder="e.g. Score 90%+ in boards, crack JEE Mains, pass CA Inter in May 2025"
-              style={{ ...inputStyle, resize: "vertical" }}
-              onFocus={(e) => (e.currentTarget.style.borderColor = "#7c3aed")}
-              onBlur={(e) => (e.currentTarget.style.borderColor = "#2a2a2a")} />
+            <textarea ref={examGoalsRef} rows={3} placeholder="e.g. Score 90%+ in boards, crack JEE Mains, pass CA Inter in May 2025"
+              style={{ ...inp, resize: "vertical" }} onFocus={focus} onBlur={blur} />
           </F>
 
           <F label="Current performance">
-            <textarea ref={performanceRef} defaultValue={draft.currentPerformance ?? ""} rows={2}
-              placeholder="e.g. Scoring 65–70%, weak in Maths, decent in Chemistry"
-              style={{ ...inputStyle, resize: "vertical" }}
-              onFocus={(e) => (e.currentTarget.style.borderColor = "#7c3aed")}
-              onBlur={(e) => (e.currentTarget.style.borderColor = "#2a2a2a")} />
+            <textarea ref={performanceRef} rows={2} placeholder="e.g. Scoring 65–70%, weak in Maths, decent in Chemistry"
+              style={{ ...inp, resize: "vertical" }} onFocus={focus} onBlur={blur} />
           </F>
 
           <Row>
             <F label="Hours available daily">
-              <Slider value={dailyStudyHours} min={1} max={14} label={(v) => `${v} hrs/day`}
-                onChange={(v) => { setDailyStudyHours(v); updateDraft({ dailyStudyHoursAvailable: v }); }} />
+              <Slider val={dailyHours} set={setDailyHours} min={1} max={14} fmt={(v) => `${v} hrs/day`} />
             </F>
             <F label="Avg session length">
-              <Slider value={sessionLength} min={15} max={180} label={(v) => `${v} min`}
-                onChange={(v) => { setSessionLength(v); updateDraft({ averageSessionLength: v }); }} />
+              <Slider val={sessionLen} set={setSessionLen} min={15} max={180} fmt={(v) => `${v} min`} />
             </F>
           </Row>
         </div>
 
-        {/* ── Section 3 ── */}
-        <div style={cardStyle}>
-          <SectionHeader n="3" title="Study Habits" sub="How you currently study — be brutally honest." />
+        {/* Section 3 */}
+        <div style={sec}>
+          <Hdr n="3" title="Study Habits" sub="How you currently study — be brutally honest." />
 
           <F label="Current study method">
-            <textarea ref={studyMethodRef} defaultValue={draft.currentStudyMethod ?? ""} rows={2}
-              placeholder="e.g. Read NCERT + watch YouTube, make notes sometimes, revise day before exams"
-              style={{ ...inputStyle, resize: "vertical" }}
-              onFocus={(e) => (e.currentTarget.style.borderColor = "#7c3aed")}
-              onBlur={(e) => (e.currentTarget.style.borderColor = "#2a2a2a")} />
+            <textarea ref={studyMethodRef} rows={2} placeholder="e.g. Read NCERT + watch YouTube, make notes sometimes, revise day before exams"
+              style={{ ...inp, resize: "vertical" }} onFocus={focus} onBlur={blur} />
           </F>
 
           <F label="Biggest distractions">
-            <ChipPicker options={DISTRACTIONS} selected={distractions}
-              onToggle={(v) => toggleItem(distractions, setDistractions, "biggestDistractions", v)} />
+            <Chips opts={DISTRACTIONS} sel={distractions} toggle={(v) => toggleChip(distractions, setDistractions, v)} />
           </F>
 
           <Row>
             <F label="Procrastination level">
-              <Slider value={procrastination} min={1} max={5}
-                label={(v) => ["Never", "Rarely", "Sometimes", "Often", "Always"][v - 1]}
-                onChange={(v) => { setProcrastination(v); updateDraft({ procrastinationLevel: v as ProcrastinationLevel }); }} />
+              <Slider val={procrastination} set={setProcrastination} min={1} max={5}
+                fmt={(v) => ["Never", "Rarely", "Sometimes", "Often", "Always"][v - 1]} />
             </F>
             <F label="Peak energy time">
-              <CardPicker options={ENERGY_OPTIONS} value={energyPeak}
-                onChange={(v) => { setEnergyPeak(v); updateDraft({ energyPeakTime: v }); }} />
+              <Cards opts={ENERGY_OPTIONS} val={energyPeak} set={setEnergyPeak} />
             </F>
           </Row>
         </div>
 
-        {/* ── Section 4 ── */}
-        <div style={cardStyle}>
-          <SectionHeader n="4" title="Daily Schedule" sub="Your current daily rhythm so we can design around it." />
+        {/* Section 4 */}
+        <div style={sec}>
+          <Hdr n="4" title="Daily Schedule" sub="Your current daily rhythm so we can design around it." />
           <Row>
             <F label="Wake-up time">
-              <input type="time" value={wakeTime} onChange={(e) => { setWakeTime(e.target.value); updateDraft({ wakeUpTime: e.target.value }); }}
-                style={inputStyle}
-                onFocus={(e) => (e.currentTarget.style.borderColor = "#7c3aed")}
-                onBlur={(e) => (e.currentTarget.style.borderColor = "#2a2a2a")} />
+              <input type="time" value={wakeTime} onChange={(e) => setWakeTime(e.target.value)}
+                style={inp} onFocus={focus} onBlur={blur} />
             </F>
             <F label="Sleep time">
-              <input type="time" value={sleepTime} onChange={(e) => { setSleepTime(e.target.value); updateDraft({ sleepTime: e.target.value }); }}
-                style={inputStyle}
-                onFocus={(e) => (e.currentTarget.style.borderColor = "#7c3aed")}
-                onBlur={(e) => (e.currentTarget.style.borderColor = "#2a2a2a")} />
+              <input type="time" value={sleepTime} onChange={(e) => setSleepTime(e.target.value)}
+                style={inp} onFocus={focus} onBlur={blur} />
             </F>
           </Row>
         </div>
 
-        {/* ── Section 5 ── */}
-        <div style={cardStyle}>
-          <SectionHeader n="5" title="Wellbeing" sub="Physical and mental health directly impacts how well you learn." />
+        {/* Section 5 */}
+        <div style={sec}>
+          <Hdr n="5" title="Wellbeing" sub="Physical and mental health directly impacts how well you learn." />
           <Row>
             <F label="Stress level">
-              <Slider value={stress} min={1} max={5}
-                label={(v) => ["Very relaxed", "Low", "Moderate", "High", "Extreme"][v - 1]}
-                onChange={(v) => { setStress(v); updateDraft({ stressLevel: v as StressLevel }); }} />
+              <Slider val={stress} set={setStress} min={1} max={5}
+                fmt={(v) => ["Very relaxed", "Low", "Moderate", "High", "Extreme"][v - 1]} />
             </F>
             <F label="Exercise frequency">
-              <select value={exercise} onChange={(e) => { setExercise(e.target.value as ExerciseFrequency); updateDraft({ exerciseFrequency: e.target.value as ExerciseFrequency }); }}
+              <select value={exercise} onChange={(e) => setExercise(e.target.value as ExerciseFrequency)}
                 style={{
-                  ...inputStyle, cursor: "pointer",
+                  ...inp, cursor: "pointer",
                   backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%23a0a0a0' d='M6 8L1 3h10z'/%3E%3C/svg%3E")`,
-                  backgroundRepeat: "no-repeat", backgroundPosition: "right 1rem center", backgroundSize: "12px", paddingRight: "2.5rem",
-                }}
-                onFocus={(e) => (e.currentTarget.style.borderColor = "#7c3aed")}
-                onBlur={(e) => (e.currentTarget.style.borderColor = "#2a2a2a")}
-              >
+                  backgroundRepeat: "no-repeat", backgroundPosition: "right 1rem center",
+                  backgroundSize: "12px", paddingRight: "2.5rem",
+                }}>
                 {EXERCISE_OPTIONS.map((o) => <option key={o.value} value={o.value} style={{ background: "#1a1a1a" }}>{o.label}</option>)}
               </select>
             </F>
@@ -520,15 +423,15 @@ export default function OnboardingPage() {
 
           <Row>
             <F label="Screen time per day (non-study)">
-              <Slider value={screenTime} min={0} max={16} label={(v) => `${v} hrs`}
-                onChange={(v) => { setScreenTime(v); updateDraft({ screenTimePerDay: v }); }} />
+              <Slider val={screenTime} set={setScreenTime} min={0} max={16} fmt={(v) => `${v} hrs`} />
             </F>
             <F label="Burnout symptoms">
               <div style={{ paddingTop: "0.5rem" }}>
-                <button type="button" onClick={() => { setBurnout(!burnout); updateDraft({ burnoutSymptoms: !burnout }); }}
+                <button type="button" onClick={() => setBurnout(!burnout)}
                   style={{ display: "flex", alignItems: "center", gap: "0.75rem", background: "none", border: "none", cursor: "pointer", padding: 0 }}>
                   <span style={{
-                    width: "44px", height: "24px", borderRadius: "999px", background: burnout ? "#7c3aed" : "#2a2a2a",
+                    width: "44px", height: "24px", borderRadius: "999px",
+                    background: burnout ? "#7c3aed" : "#2a2a2a",
                     position: "relative", display: "block", transition: "background 0.2s", flexShrink: 0,
                   }}>
                     <span style={{
@@ -547,38 +450,30 @@ export default function OnboardingPage() {
             <label style={{ display: "block", color: "#c0c0c0", fontSize: "0.82rem", fontWeight: 600, marginBottom: "0.5rem" }}>
               Social media apps you use
             </label>
-            <ChipPicker options={SOCIAL_MEDIA} selected={socialMedia}
-              onToggle={(v) => toggleItem(socialMedia, setSocialMedia, "socialMediaApps", v)} />
+            <Chips opts={SOCIAL_MEDIA} sel={socialMedia} toggle={(v) => toggleChip(socialMedia, setSocialMedia, v)} />
           </div>
         </div>
 
-        {/* ── Section 6 ── */}
-        <div style={cardStyle}>
-          <SectionHeader n="6" title="Goals & Coaching" sub="What you want and how you want to be coached." />
+        {/* Section 6 */}
+        <div style={sec}>
+          <Hdr n="6" title="Goals & Coaching" sub="What you want and how you want to be coached." />
 
           <F label="Primary goal (in your own words)">
-            <textarea ref={primaryGoalRef} defaultValue={draft.primaryGoal ?? ""} rows={2}
-              placeholder="e.g. I want to stop wasting time and study consistently so I can crack NEET this year"
-              style={{ ...inputStyle, resize: "vertical" }}
-              onFocus={(e) => (e.currentTarget.style.borderColor = "#7c3aed")}
-              onBlur={(e) => (e.currentTarget.style.borderColor = "#2a2a2a")} />
+            <textarea ref={primaryGoalRef} rows={2} placeholder="e.g. I want to stop wasting time and study consistently so I can crack NEET this year"
+              style={{ ...inp, resize: "vertical" }} onFocus={focus} onBlur={blur} />
           </F>
 
           <F label="Coach personality">
-            <CardPicker options={COACH_OPTIONS} value={coachPersonality}
-              onChange={(v) => { setCoachPersonality(v); updateDraft({ coachPersonality: v }); }} />
+            <Cards opts={COACH_OPTIONS} val={coachPersonality} set={setCoachPersonality} />
           </F>
 
           <F label="Previous systems you've tried">
-            <textarea ref={previousSystemsRef} defaultValue={draft.previousSystemsTried ?? ""} rows={2}
-              placeholder="e.g. Tried Pomodoro but kept skipping. Made timetables but never followed them."
-              style={{ ...inputStyle, resize: "vertical" }}
-              onFocus={(e) => (e.currentTarget.style.borderColor = "#7c3aed")}
-              onBlur={(e) => (e.currentTarget.style.borderColor = "#2a2a2a")} />
+            <textarea ref={prevSystemsRef} rows={2} placeholder="e.g. Tried Pomodoro but kept skipping. Made timetables but never followed them."
+              style={{ ...inp, resize: "vertical" }} onFocus={focus} onBlur={blur} />
           </F>
         </div>
 
-        {/* ── Submit ── */}
+        {/* Submit */}
         <div style={{ textAlign: "center", paddingTop: "1rem" }}>
           <button type="button" onClick={handleSubmit} style={{
             padding: "1rem 3rem", background: "linear-gradient(135deg, #7c3aed, #ec4899)",
