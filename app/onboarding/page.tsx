@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback } from "react";
+import { useState, useCallback, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { useAppStore } from "@/lib/store";
 import type {
@@ -99,70 +99,92 @@ export default function OnboardingPage() {
   const router = useRouter();
   const { setStudentProfile } = useAppStore();
 
-  const [profile, setLocalProfile] = useState<StudentProfile>(() => {
+  // ── Profile state (source of truth) ─────────────────────────────────────────
+  const [profile, setProfile] = useState<StudentProfile>(() => {
     if (typeof window !== "undefined") {
       try {
         const saved = localStorage.getItem(DRAFT_KEY);
         if (saved) return { ...defaultProfile, ...JSON.parse(saved) };
-      } catch {
-        // ignore
-      }
+      } catch { /* ignore */ }
     }
     return defaultProfile;
   });
 
+  // ── Local text states — these are what the inputs show ──────────────────────
+  // They update freely on every keystroke WITHOUT touching profile/localStorage
+  const [localName, setLocalName] = useState(profile.name);
+  const [localAge, setLocalAge] = useState(String(profile.age));
+  const [localFieldOfStudy, setLocalFieldOfStudy] = useState(profile.fieldOfStudy);
+  const [localExamGoals, setLocalExamGoals] = useState(profile.examGoals);
+  const [localPerformance, setLocalPerformance] = useState(profile.currentPerformance);
+  const [localStudyMethod, setLocalStudyMethod] = useState(profile.currentStudyMethod);
+  const [localPrimaryGoal, setLocalPrimaryGoal] = useState(profile.primaryGoal);
+  const [localPreviousSystems, setLocalPreviousSystems] = useState(profile.previousSystemsTried);
   const [subjectInput, setSubjectInput] = useState("");
+
   const [errors, setErrors] = useState<string[]>([]);
   const [saveStatus, setSaveStatus] = useState("");
   const [submitAttempted, setSubmitAttempted] = useState(false);
 
-  const update = useCallback((patch: Partial<StudentProfile>) => {
-    setLocalProfile((prev) => {
-      const next = { ...prev, ...patch };
-      setSaveStatus("saving");
-      try {
-        localStorage.setItem(DRAFT_KEY, JSON.stringify(next));
-        setTimeout(() => setSaveStatus("saved"), 400);
-      } catch {
-        // ignore
-      }
-      return next;
-    });
+  // ── Save to localStorage (called only on blur / slider change / chip toggle) ─
+  const save = useCallback((updated: StudentProfile) => {
+    setSaveStatus("saving");
+    try {
+      localStorage.setItem(DRAFT_KEY, JSON.stringify(updated));
+      setTimeout(() => setSaveStatus("saved"), 300);
+    } catch { /* ignore */ }
   }, []);
 
-  const toggleArray = (
-    field: "subjects" | "biggestDistractions" | "socialMediaApps",
-    value: string
-  ) => {
+  // Commit a field patch to profile + save
+  const commit = useCallback((patch: Partial<StudentProfile>) => {
+    setProfile((prev) => {
+      const next = { ...prev, ...patch };
+      save(next);
+      return next;
+    });
+  }, [save]);
+
+  // ── Chips & cards (instant commit — no typing involved) ──────────────────────
+  const toggleArray = (field: "subjects" | "biggestDistractions" | "socialMediaApps", value: string) => {
     const arr = profile[field] as string[];
-    const next = arr.includes(value)
-      ? arr.filter((x) => x !== value)
-      : [...arr, value];
-    update({ [field]: next } as Partial<StudentProfile>);
+    const next = arr.includes(value) ? arr.filter((x) => x !== value) : [...arr, value];
+    commit({ [field]: next } as Partial<StudentProfile>);
   };
 
   const addSubject = () => {
     const trimmed = subjectInput.trim();
     if (trimmed && !profile.subjects.includes(trimmed)) {
-      update({ subjects: [...profile.subjects, trimmed] });
+      commit({ subjects: [...profile.subjects, trimmed] });
       setSubjectInput("");
     }
   };
 
   const handleSubmit = () => {
+    // Commit any text that might not have been blurred yet
+    const finalProfile: StudentProfile = {
+      ...profile,
+      name: localName.trim(),
+      age: Number(localAge) || profile.age,
+      fieldOfStudy: localFieldOfStudy.trim(),
+      examGoals: localExamGoals.trim(),
+      currentPerformance: localPerformance.trim(),
+      currentStudyMethod: localStudyMethod.trim(),
+      primaryGoal: localPrimaryGoal.trim(),
+      previousSystemsTried: localPreviousSystems.trim(),
+    };
     setSubmitAttempted(true);
-    const errs = validate(profile);
+    const errs = validate(finalProfile);
     setErrors(errs);
     if (errs.length > 0) {
-      const el = document.getElementById("error-box");
-      if (el) el.scrollIntoView({ behavior: "smooth", block: "center" });
+      document.getElementById("error-box")?.scrollIntoView({ behavior: "smooth", block: "center" });
       return;
     }
-    setStudentProfile(profile);
+    setStudentProfile(finalProfile);
     localStorage.removeItem(DRAFT_KEY);
     router.push("/generating");
   };
 
+  // ── Styles ───────────────────────────────────────────────────────────────────
   const inputBase: React.CSSProperties = {
     width: "100%",
     background: "#1a1a1a",
@@ -174,6 +196,7 @@ export default function OnboardingPage() {
     outline: "none",
     boxSizing: "border-box",
     fontFamily: "inherit",
+    transition: "border-color 0.15s",
   };
 
   const sectionCard: React.CSSProperties = {
@@ -183,6 +206,8 @@ export default function OnboardingPage() {
     padding: "2rem",
     marginBottom: "1.5rem",
   };
+
+  // ── Inner components ─────────────────────────────────────────────────────────
 
   const SectionHeader = ({ number, title, subtitle }: { number: string; title: string; subtitle: string }) => (
     <div style={{ marginBottom: "1.75rem" }}>
@@ -214,31 +239,50 @@ export default function OnboardingPage() {
     </div>
   );
 
-  const TextInput = ({ value, onChange, placeholder, type = "text" }: {
-    value: string | number; onChange: (v: string) => void; placeholder?: string; type?: string;
+  // Text input: local state updates freely, commits on blur
+  const BlurInput = ({
+    value, onChange, onCommit, placeholder, type = "text",
+  }: {
+    value: string;
+    onChange: (v: string) => void;
+    onCommit: (v: string) => void;
+    placeholder?: string;
+    type?: string;
   }) => (
     <input
       type={type}
       value={value}
       onChange={(e) => onChange(e.target.value)}
+      onBlur={(e) => {
+        onCommit(e.target.value);
+        e.currentTarget.style.borderColor = "#2a2a2a";
+      }}
+      onFocus={(e) => (e.currentTarget.style.borderColor = "#7c3aed")}
       placeholder={placeholder}
       style={inputBase}
-      onFocus={(e) => (e.currentTarget.style.borderColor = "#7c3aed")}
-      onBlur={(e) => (e.currentTarget.style.borderColor = "#2a2a2a")}
     />
   );
 
-  const TextArea = ({ value, onChange, placeholder, rows = 3 }: {
-    value: string; onChange: (v: string) => void; placeholder?: string; rows?: number;
+  const BlurTextArea = ({
+    value, onChange, onCommit, placeholder, rows = 3,
+  }: {
+    value: string;
+    onChange: (v: string) => void;
+    onCommit: (v: string) => void;
+    placeholder?: string;
+    rows?: number;
   }) => (
     <textarea
       value={value}
       onChange={(e) => onChange(e.target.value)}
+      onBlur={(e) => {
+        onCommit(e.target.value);
+        e.currentTarget.style.borderColor = "#2a2a2a";
+      }}
+      onFocus={(e) => (e.currentTarget.style.borderColor = "#7c3aed")}
       placeholder={placeholder}
       rows={rows}
       style={{ ...inputBase, resize: "vertical" }}
-      onFocus={(e) => (e.currentTarget.style.borderColor = "#7c3aed")}
-      onBlur={(e) => (e.currentTarget.style.borderColor = "#2a2a2a")}
     />
   );
 
@@ -348,6 +392,7 @@ export default function OnboardingPage() {
     <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "1.25rem" }}>{children}</div>
   );
 
+  // ── Render ───────────────────────────────────────────────────────────────────
   return (
     <div style={{ minHeight: "100vh", background: "#0a0a0a", fontFamily: "'Inter', sans-serif", paddingBottom: "6rem" }}>
 
@@ -364,7 +409,7 @@ export default function OnboardingPage() {
           WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent",
         }}>PeakMind</span>
         <span style={{ fontSize: "0.75rem", color: saveStatus === "saved" ? "#4ade80" : "#444" }}>
-          {saveStatus === "saved" ? "✓ Draft saved" : saveStatus === "saving" ? "Saving…" : "Auto-saves as you type"}
+          {saveStatus === "saved" ? "✓ Draft saved" : saveStatus === "saving" ? "Saving…" : "Saves when you leave each field"}
         </span>
       </div>
 
@@ -405,35 +450,56 @@ export default function OnboardingPage() {
           </div>
         )}
 
-        {/* Section 1 */}
+        {/* ── Section 1: About You ── */}
         <div style={sectionCard}>
           <SectionHeader number="1" title="About You" subtitle="Basic identity — who you are and where you are in life." />
           <Row>
             <Field label="Your name">
-              <TextInput value={profile.name} onChange={(v) => update({ name: v })} placeholder="e.g. Arjun" />
+              <BlurInput
+                value={localName}
+                onChange={setLocalName}
+                onCommit={(v) => commit({ name: v.trim() })}
+                placeholder="e.g. Arjun"
+              />
             </Field>
             <Field label="Age">
-              <TextInput type="number" value={profile.age} onChange={(v) => update({ age: Number(v) })} placeholder="18" />
+              <BlurInput
+                type="number"
+                value={localAge}
+                onChange={setLocalAge}
+                onCommit={(v) => commit({ age: Number(v) })}
+                placeholder="18"
+              />
             </Field>
           </Row>
           <Field label="Education level">
-            <Cards options={educationOptions} value={profile.educationLevel} onChange={(v) => update({ educationLevel: v })} />
+            <Cards
+              options={educationOptions}
+              value={profile.educationLevel}
+              onChange={(v) => commit({ educationLevel: v })}
+            />
           </Field>
           <Field label="Field of study / work">
-            <TextInput value={profile.fieldOfStudy} onChange={(v) => update({ fieldOfStudy: v })} placeholder="e.g. Computer Science, CA Foundation, UPSC" />
+            <BlurInput
+              value={localFieldOfStudy}
+              onChange={setLocalFieldOfStudy}
+              onCommit={(v) => commit({ fieldOfStudy: v.trim() })}
+              placeholder="e.g. Computer Science, CA Foundation, UPSC"
+            />
           </Field>
         </div>
 
-        {/* Section 2 */}
+        {/* ── Section 2: Academic Profile ── */}
         <div style={sectionCard}>
           <SectionHeader number="2" title="Academic Profile" subtitle="What you're studying and where you stand right now." />
+
           <Field label="Subjects you study">
             <div style={{ display: "flex", gap: "0.5rem", marginBottom: "0.65rem" }}>
               <input
                 value={subjectInput}
                 onChange={(e) => setSubjectInput(e.target.value)}
                 onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); addSubject(); } }}
-                placeholder="Type a subject and press Enter"
+                placeholder="Type a subject and press Enter or Add"
                 style={inputBase}
                 onFocus={(e) => (e.currentTarget.style.borderColor = "#7c3aed")}
                 onBlur={(e) => (e.currentTarget.style.borderColor = "#2a2a2a")}
@@ -454,7 +520,7 @@ export default function OnboardingPage() {
                   }}>
                     {s}
                     <button type="button"
-                      onClick={() => update({ subjects: profile.subjects.filter((x) => x !== s) })}
+                      onClick={() => commit({ subjects: profile.subjects.filter((x) => x !== s) })}
                       style={{ background: "none", border: "none", color: "#ec4899", cursor: "pointer", padding: 0, fontSize: "1rem", lineHeight: 1 }}
                     >×</button>
                   </span>
@@ -462,98 +528,199 @@ export default function OnboardingPage() {
               </div>
             )}
           </Field>
+
           <Field label="Exam goals / targets">
-            <TextArea value={profile.examGoals} onChange={(v) => update({ examGoals: v })} placeholder="e.g. Score 90%+ in boards, crack JEE Mains, pass CA Inter in May 2025" />
+            <BlurTextArea
+              value={localExamGoals}
+              onChange={setLocalExamGoals}
+              onCommit={(v) => commit({ examGoals: v.trim() })}
+              placeholder="e.g. Score 90%+ in boards, crack JEE Mains, pass CA Inter in May 2025"
+            />
           </Field>
+
           <Field label="Current performance">
-            <TextArea value={profile.currentPerformance} onChange={(v) => update({ currentPerformance: v })} placeholder="e.g. Scoring 65–70%, weak in Maths, decent in Chemistry" rows={2} />
+            <BlurTextArea
+              value={localPerformance}
+              onChange={setLocalPerformance}
+              onCommit={(v) => commit({ currentPerformance: v.trim() })}
+              placeholder="e.g. Scoring 65–70%, weak in Maths, decent in Chemistry"
+              rows={2}
+            />
           </Field>
+
           <Row>
             <Field label="Hours available daily">
-              <Slider value={profile.dailyStudyHoursAvailable} onChange={(v) => update({ dailyStudyHoursAvailable: v })} min={1} max={14} label={(v) => `${v} hrs/day`} />
+              <Slider
+                value={profile.dailyStudyHoursAvailable}
+                onChange={(v) => commit({ dailyStudyHoursAvailable: v })}
+                min={1} max={14} label={(v) => `${v} hrs/day`}
+              />
             </Field>
             <Field label="Avg session length">
-              <Slider value={profile.averageSessionLength} onChange={(v) => update({ averageSessionLength: v })} min={15} max={180} label={(v) => `${v} min`} />
+              <Slider
+                value={profile.averageSessionLength}
+                onChange={(v) => commit({ averageSessionLength: v })}
+                min={15} max={180} label={(v) => `${v} min`}
+              />
             </Field>
           </Row>
         </div>
 
-        {/* Section 3 */}
+        {/* ── Section 3: Study Habits ── */}
         <div style={sectionCard}>
           <SectionHeader number="3" title="Study Habits" subtitle="How you currently study — be brutally honest." />
+
           <Field label="Current study method">
-            <TextArea value={profile.currentStudyMethod} onChange={(v) => update({ currentStudyMethod: v })} placeholder="e.g. Read NCERT + watch YouTube, make notes sometimes, revise day before exams" rows={2} />
+            <BlurTextArea
+              value={localStudyMethod}
+              onChange={setLocalStudyMethod}
+              onCommit={(v) => commit({ currentStudyMethod: v.trim() })}
+              placeholder="e.g. Read NCERT + watch YouTube, make notes sometimes, revise day before exams"
+              rows={2}
+            />
           </Field>
+
           <Field label="Biggest distractions">
-            <Chips options={distractionOptions} selected={profile.biggestDistractions} onToggle={(v) => toggleArray("biggestDistractions", v)} />
+            <Chips
+              options={distractionOptions}
+              selected={profile.biggestDistractions}
+              onToggle={(v) => toggleArray("biggestDistractions", v)}
+            />
           </Field>
+
           <Row>
             <Field label="Procrastination level">
-              <Slider value={profile.procrastinationLevel} onChange={(v) => update({ procrastinationLevel: v as ProcrastinationLevel })} min={1} max={5} label={(v) => ["Never", "Rarely", "Sometimes", "Often", "Always"][v - 1]} />
+              <Slider
+                value={profile.procrastinationLevel}
+                onChange={(v) => commit({ procrastinationLevel: v as ProcrastinationLevel })}
+                min={1} max={5}
+                label={(v) => ["Never", "Rarely", "Sometimes", "Often", "Always"][v - 1]}
+              />
             </Field>
             <Field label="Peak energy time">
-              <Cards options={energyOptions} value={profile.energyPeakTime} onChange={(v) => update({ energyPeakTime: v })} />
+              <Cards
+                options={energyOptions}
+                value={profile.energyPeakTime}
+                onChange={(v) => commit({ energyPeakTime: v })}
+              />
             </Field>
           </Row>
         </div>
 
-        {/* Section 4 */}
+        {/* ── Section 4: Daily Schedule ── */}
         <div style={sectionCard}>
           <SectionHeader number="4" title="Daily Schedule" subtitle="Your current daily rhythm so we can design around it." />
           <Row>
             <Field label="Wake-up time">
-              <TextInput type="time" value={profile.wakeUpTime} onChange={(v) => update({ wakeUpTime: v })} />
+              <input
+                type="time"
+                value={profile.wakeUpTime}
+                onChange={(e) => commit({ wakeUpTime: e.target.value })}
+                style={inputBase}
+                onFocus={(e) => (e.currentTarget.style.borderColor = "#7c3aed")}
+                onBlur={(e) => (e.currentTarget.style.borderColor = "#2a2a2a")}
+              />
             </Field>
             <Field label="Sleep time">
-              <TextInput type="time" value={profile.sleepTime} onChange={(v) => update({ sleepTime: v })} />
+              <input
+                type="time"
+                value={profile.sleepTime}
+                onChange={(e) => commit({ sleepTime: e.target.value })}
+                style={inputBase}
+                onFocus={(e) => (e.currentTarget.style.borderColor = "#7c3aed")}
+                onBlur={(e) => (e.currentTarget.style.borderColor = "#2a2a2a")}
+              />
             </Field>
           </Row>
         </div>
 
-        {/* Section 5 */}
+        {/* ── Section 5: Wellbeing ── */}
         <div style={sectionCard}>
           <SectionHeader number="5" title="Wellbeing" subtitle="Physical and mental health directly impacts how well you learn." />
+
           <Row>
             <Field label="Stress level">
-              <Slider value={profile.stressLevel} onChange={(v) => update({ stressLevel: v as StressLevel })} min={1} max={5} label={(v) => ["Very relaxed", "Low", "Moderate", "High", "Extreme"][v - 1]} />
+              <Slider
+                value={profile.stressLevel}
+                onChange={(v) => commit({ stressLevel: v as StressLevel })}
+                min={1} max={5}
+                label={(v) => ["Very relaxed", "Low", "Moderate", "High", "Extreme"][v - 1]}
+              />
             </Field>
             <Field label="Exercise frequency">
-              <SelectInput value={profile.exerciseFrequency} onChange={(v) => update({ exerciseFrequency: v })} options={exerciseOptions} />
+              <SelectInput
+                value={profile.exerciseFrequency}
+                onChange={(v) => commit({ exerciseFrequency: v })}
+                options={exerciseOptions}
+              />
             </Field>
           </Row>
+
           <Row>
             <Field label="Screen time per day (non-study)">
-              <Slider value={profile.screenTimePerDay} onChange={(v) => update({ screenTimePerDay: v })} min={0} max={16} label={(v) => `${v} hrs`} />
+              <Slider
+                value={profile.screenTimePerDay}
+                onChange={(v) => commit({ screenTimePerDay: v })}
+                min={0} max={16} label={(v) => `${v} hrs`}
+              />
             </Field>
             <Field label="Burnout symptoms">
               <div style={{ paddingTop: "0.5rem" }}>
-                <Toggle value={profile.burnoutSymptoms} onChange={(v) => update({ burnoutSymptoms: v })} label={profile.burnoutSymptoms ? "Yes, feeling burnt out" : "No, I'm okay"} />
+                <Toggle
+                  value={profile.burnoutSymptoms}
+                  onChange={(v) => commit({ burnoutSymptoms: v })}
+                  label={profile.burnoutSymptoms ? "Yes, feeling burnt out" : "No, I'm okay"}
+                />
               </div>
             </Field>
           </Row>
+
           <div style={{ marginBottom: "1.25rem" }}>
             <label style={{ display: "block", color: "#c0c0c0", fontSize: "0.82rem", fontWeight: 600, marginBottom: "0.5rem" }}>
               Social media apps you use
             </label>
-            <Chips options={socialMediaOptions} selected={profile.socialMediaApps} onToggle={(v) => toggleArray("socialMediaApps", v)} />
+            <Chips
+              options={socialMediaOptions}
+              selected={profile.socialMediaApps}
+              onToggle={(v) => toggleArray("socialMediaApps", v)}
+            />
           </div>
         </div>
 
-        {/* Section 6 */}
+        {/* ── Section 6: Goals & Coaching ── */}
         <div style={sectionCard}>
           <SectionHeader number="6" title="Goals & Coaching" subtitle="What you want and how you want to be coached." />
+
           <Field label="Primary goal (in your own words)">
-            <TextArea value={profile.primaryGoal} onChange={(v) => update({ primaryGoal: v })} placeholder="e.g. I want to stop wasting time and study consistently so I can crack NEET this year" rows={2} />
+            <BlurTextArea
+              value={localPrimaryGoal}
+              onChange={setLocalPrimaryGoal}
+              onCommit={(v) => commit({ primaryGoal: v.trim() })}
+              placeholder="e.g. I want to stop wasting time and study consistently so I can crack NEET this year"
+              rows={2}
+            />
           </Field>
+
           <Field label="Coach personality">
-            <Cards options={coachOptions} value={profile.coachPersonality} onChange={(v) => update({ coachPersonality: v })} />
+            <Cards
+              options={coachOptions}
+              value={profile.coachPersonality}
+              onChange={(v) => commit({ coachPersonality: v })}
+            />
           </Field>
+
           <Field label="Previous systems you've tried">
-            <TextArea value={profile.previousSystemsTried} onChange={(v) => update({ previousSystemsTried: v })} placeholder="e.g. Tried Pomodoro but kept skipping. Made timetables but never followed them." rows={2} />
+            <BlurTextArea
+              value={localPreviousSystems}
+              onChange={setLocalPreviousSystems}
+              onCommit={(v) => commit({ previousSystemsTried: v.trim() })}
+              placeholder="e.g. Tried Pomodoro but kept skipping. Made timetables but never followed them."
+              rows={2}
+            />
           </Field>
         </div>
 
-        {/* Submit */}
+        {/* ── Submit ── */}
         <div style={{ textAlign: "center", paddingTop: "1rem" }}>
           <button
             type="button"
