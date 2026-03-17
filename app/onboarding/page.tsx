@@ -184,6 +184,36 @@ export default function OnboardingPage() {
     wakeTime, sleepTime, procrastination, energyPeak, stress, exercise,
     screenTime, burnout, socialMedia, coachPersonality, setStudentProfile, router]);
 
+  function fillTestData() {
+    setText({
+      name: "Maneesh Awasthi",
+      age: "20",
+      fieldOfStudy: "Engineering",
+      examGoals: "JEE Advanced 2025",
+      currentPerformance: "Average, scoring around 60%",
+      currentStudyMethod: "Reading textbooks and solving some problems",
+      primaryGoal: "Get into IIT — stop wasting time and study consistently",
+      previousSystemsTried: "Pomodoro, various apps, nothing stuck",
+      subjectInput: "",
+    });
+    setEduLevel("high_school");
+    setSubjects(["Mathematics", "Physics", "Chemistry"]);
+    setDailyHours(8);
+    setSessionLen(60);
+    setDistractions(["Instagram", "YouTube", "Phone notifications"]);
+    setProcrastination(4);
+    setEnergyPeak("morning");
+    setWakeTime("06:00");
+    setSleepTime("23:00");
+    setStress(4);
+    setExercise("rarely");
+    setScreenTime(5);
+    setBurnout(false);
+    setSocialMedia(["Instagram", "YouTube"]);
+    setCoachPersonality("strict");
+    setErrors([]);
+  }
+
   const fo = (e: React.FocusEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) =>
     (e.currentTarget.style.borderColor = "#7c3aed");
   const bl = (e: React.FocusEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) =>
@@ -581,7 +611,12 @@ export default function OnboardingPage() {
         </div>
 
         {/* Submit */}
-        <div style={{ textAlign: "center", paddingTop: "1rem" }}>
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: "1rem", paddingTop: "1rem" }}>
+          <button type="button" onClick={fillTestData} style={{
+            padding: "0.5rem 1rem", fontSize: "0.72rem", color: "#555",
+            background: "#111", border: "1px solid #2a2a2a", borderRadius: "8px",
+            cursor: "pointer", fontFamily: "monospace", whiteSpace: "nowrap",
+          }}>[dev] fill test data</button>
           <button type="button" onClick={handleSubmit} style={{
             padding: "1rem 3rem", background: "linear-gradient(135deg,#7c3aed,#ec4899)",
             color: "#fff", border: "none", borderRadius: "12px", fontSize: "1rem",
@@ -593,10 +628,10 @@ export default function OnboardingPage() {
           >
             Generate My System →
           </button>
-          <p style={{ color: "#444", fontSize: "0.75rem", marginTop: "0.75rem" }}>
-            Takes 30–60 seconds to build your complete plan
-          </p>
         </div>
+        <p style={{ color: "#444", fontSize: "0.75rem", marginTop: "0.75rem", textAlign: "center" }}>
+          Takes 30–60 seconds to build your complete plan
+        </p>
 
       </div>
     </div>

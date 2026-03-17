@@ -3,7 +3,218 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useAppStore } from "@/lib/store";
-import type { Habit } from "@/lib/types";
+import type { Habit, StudentProfile, MasterPlan } from "@/lib/types";
+
+// ─── DEV BYPASS ───────────────────────────────────────────────────────────────
+const MOCK_PROFILE: StudentProfile = {
+  name: "Maneesh Awasthi",
+  age: 20,
+  educationLevel: "high_school",
+  fieldOfStudy: "Engineering",
+  subjects: ["Mathematics", "Physics", "Chemistry"],
+  examGoals: "JEE Advanced 2025",
+  dailyStudyHoursAvailable: 8,
+  currentPerformance: "Average, scoring around 60%",
+  wakeUpTime: "06:00",
+  sleepTime: "23:00",
+  currentStudyMethod: "Reading textbooks and solving some problems",
+  averageSessionLength: 60,
+  biggestDistractions: ["Phone", "YouTube", "Instagram"],
+  procrastinationLevel: 4,
+  energyPeakTime: "morning",
+  stressLevel: 4,
+  burnoutSymptoms: false,
+  exerciseFrequency: "rarely",
+  screenTimePerDay: 5,
+  socialMediaApps: ["Instagram", "YouTube"],
+  primaryGoal: "Get into IIT",
+  coachPersonality: "strict",
+  previousSystemsTried: "Pomodoro, various apps, nothing stuck",
+};
+
+const MOCK_PLAN: MasterPlan = {
+  diagnosis: {
+    primaryProblems: [
+      "Passive study methods with no active recall",
+      "Chronic phone-driven distraction breaking focus cycles",
+      "No structured revision system causing rapid forgetting",
+    ],
+    rootCauses: [
+      "Lack of accountability and external structure",
+      "Dopamine dependency on short-form content",
+      "No feedback loop to know what is actually understood",
+    ],
+    psychologicalProfile: "High-potential underperformer with strong ability but weak systems",
+    urgencyLevel: "high",
+    keyInsight: "You're not short on intelligence — you're short on structure. Fix the system, and the marks will follow.",
+    strengths: [
+      "High intrinsic motivation (IIT goal)",
+      "Self-aware about weaknesses",
+      "8 hours of available daily study time",
+    ],
+  },
+  strategy: {
+    primaryStudyMethod: "Active Recall + Spaced Repetition",
+    primaryMethodDescription:
+      "Close the book after reading each section and write down everything you remember. Review using flashcards at increasing intervals (1 day, 3 days, 7 days). This forces your brain to retrieve information rather than passively re-read it.",
+    secondaryMethod: "Feynman Technique",
+    subjects: [
+      { subject: "Mathematics", priority: "high", weeklyHours: 14, reason: "Highest scoring potential, needs daily practice", recommendedMethod: "Problem sets with active recall" },
+      { subject: "Physics", priority: "high", weeklyHours: 12, reason: "Concept-heavy; requires understanding before solving", recommendedMethod: "Concept mapping + problem practice" },
+      { subject: "Chemistry", priority: "medium", weeklyHours: 10, reason: "Memorisation-heavy; spaced repetition is key", recommendedMethod: "Flashcards + practice problems" },
+    ],
+    weeklyStudyHours: 36,
+    sessionLength: 90,
+    breakDuration: 15,
+  },
+  dailyRoutine: [
+    { id: "dr1", timeBlock: "06:00–06:30", activity: "Wake up, hydrate, no phone", category: "health", isFlexible: false },
+    { id: "dr2", timeBlock: "06:30–08:00", activity: "Mathematics — deep work block 1", category: "deep_work", isFlexible: false },
+    { id: "dr3", timeBlock: "08:00–08:30", activity: "Breakfast + short walk", category: "meal", isFlexible: true },
+    { id: "dr4", timeBlock: "08:30–10:00", activity: "Physics — concept + problems", category: "study", isFlexible: false },
+    { id: "dr5", timeBlock: "10:00–10:15", activity: "Break — no screens", category: "rest", isFlexible: false },
+    { id: "dr6", timeBlock: "10:15–11:45", activity: "Mathematics — deep work block 2", category: "deep_work", isFlexible: false },
+    { id: "dr7", timeBlock: "12:00–13:00", activity: "Lunch + rest", category: "meal", isFlexible: true },
+    { id: "dr8", timeBlock: "13:00–14:30", activity: "Chemistry — flashcards + problems", category: "study", isFlexible: false },
+    { id: "dr9", timeBlock: "14:30–14:45", activity: "Break", category: "rest", isFlexible: false },
+    { id: "dr10", timeBlock: "14:45–16:15", activity: "Physics — problem solving", category: "study", isFlexible: false },
+    { id: "dr11", timeBlock: "17:00–17:30", activity: "Exercise / walk", category: "health", isFlexible: true },
+    { id: "dr12", timeBlock: "19:00–20:30", activity: "Revision — spaced repetition session", category: "study", isFlexible: false },
+    { id: "dr13", timeBlock: "20:30–21:00", activity: "Daily review — what did I learn?", category: "admin", isFlexible: false },
+    { id: "dr14", timeBlock: "23:00", activity: "Sleep — phone in another room", category: "rest", isFlexible: false },
+  ],
+  weeklySchedule: [
+    {
+      day: "Monday", isRestDay: false,
+      blocks: [
+        { id: "b1", time: "06:30", subject: "Mathematics", method: "Active Recall", durationMinutes: 90 },
+        { id: "b2", time: "08:30", subject: "Physics", method: "Concept Mapping", durationMinutes: 90 },
+        { id: "b3", time: "13:00", subject: "Chemistry", method: "Flashcards", durationMinutes: 90 },
+        { id: "b4", time: "19:00", subject: "Revision", method: "Spaced Repetition", durationMinutes: 90 },
+      ],
+    },
+    {
+      day: "Tuesday", isRestDay: false,
+      blocks: [
+        { id: "b5", time: "06:30", subject: "Physics", method: "Problem Solving", durationMinutes: 90 },
+        { id: "b6", time: "08:30", subject: "Mathematics", method: "Problem Sets", durationMinutes: 90 },
+        { id: "b7", time: "13:00", subject: "Chemistry", method: "Active Recall", durationMinutes: 90 },
+        { id: "b8", time: "19:00", subject: "Mathematics", method: "Revision", durationMinutes: 90 },
+      ],
+    },
+    {
+      day: "Wednesday", isRestDay: false,
+      blocks: [
+        { id: "b9", time: "06:30", subject: "Mathematics", method: "Active Recall", durationMinutes: 90 },
+        { id: "b10", time: "08:30", subject: "Chemistry", method: "Problem Solving", durationMinutes: 90 },
+        { id: "b11", time: "13:00", subject: "Physics", method: "Feynman Technique", durationMinutes: 90 },
+        { id: "b12", time: "19:00", subject: "Revision", method: "Spaced Repetition", durationMinutes: 90 },
+      ],
+    },
+    {
+      day: "Thursday", isRestDay: false,
+      blocks: [
+        { id: "b13", time: "06:30", subject: "Physics", method: "Active Recall", durationMinutes: 90 },
+        { id: "b14", time: "08:30", subject: "Mathematics", method: "Problem Sets", durationMinutes: 90 },
+        { id: "b15", time: "13:00", subject: "Chemistry", method: "Flashcards", durationMinutes: 90 },
+        { id: "b16", time: "19:00", subject: "Mathematics", method: "Revision", durationMinutes: 90 },
+      ],
+    },
+    {
+      day: "Friday", isRestDay: false,
+      blocks: [
+        { id: "b17", time: "06:30", subject: "Mathematics", method: "Mock Test", durationMinutes: 90 },
+        { id: "b18", time: "08:30", subject: "Physics", method: "Mock Test", durationMinutes: 90 },
+        { id: "b19", time: "13:00", subject: "Chemistry", method: "Mock Test", durationMinutes: 90 },
+        { id: "b20", time: "19:00", subject: "Revision", method: "Full Review", durationMinutes: 90 },
+      ],
+    },
+    {
+      day: "Saturday", isRestDay: false,
+      blocks: [
+        { id: "b21", time: "09:00", subject: "Mathematics", method: "Problem Solving", durationMinutes: 120 },
+        { id: "b22", time: "13:00", subject: "Physics", method: "Problem Solving", durationMinutes: 120 },
+        { id: "b23", time: "19:00", subject: "Weekly Review", method: "Spaced Repetition", durationMinutes: 90 },
+      ],
+    },
+    { day: "Sunday", isRestDay: true, blocks: [] },
+  ],
+  habitSystem: [
+    { id: "h1", habit: "No phone for first 30 minutes after waking", frequency: "daily", category: "lifestyle", whyItMatters: "Sets a focused tone; breaks the dopamine-first-thing cycle", streak: 0, completedToday: false, completionHistory: [] },
+    { id: "h2", habit: "Complete at least 3 study blocks", frequency: "daily", category: "study", whyItMatters: "Non-negotiable daily minimum to stay on track for JEE", streak: 0, completedToday: false, completionHistory: [] },
+    { id: "h3", habit: "Active recall on one topic before moving on", frequency: "daily", category: "study", whyItMatters: "Prevents passive reading trap; forces real understanding", streak: 0, completedToday: false, completionHistory: [] },
+    { id: "h4", habit: "Phone in another room during study blocks", frequency: "daily", category: "focus", whyItMatters: "Even phone presence reduces cognitive capacity by 10%", streak: 0, completedToday: false, completionHistory: [] },
+    { id: "h5", habit: "Write daily review (3 things learned today)", frequency: "daily", category: "mindset", whyItMatters: "Reinforces memory and builds metacognitive awareness", streak: 0, completedToday: false, completionHistory: [] },
+    { id: "h6", habit: "30-minute exercise or walk", frequency: "daily", category: "health", whyItMatters: "Increases BDNF — directly improves memory and focus", streak: 0, completedToday: false, completionHistory: [] },
+    { id: "h7", habit: "Weekly mock test (1 subject)", frequency: "weekly", category: "study", whyItMatters: "Simulates exam pressure and reveals actual gaps", streak: 0, completedToday: false, completionHistory: [] },
+  ],
+  distractionControl: {
+    topDistractions: ["Phone", "YouTube", "Instagram"],
+    blockingRules: [
+      "Phone stays in a separate room during all study blocks",
+      "Use app blockers (Cold Turkey / BlockSite) for YouTube and Instagram from 6am–5pm",
+      "Only 1 hour of screen time allowed after 8pm — set a hard timer",
+    ],
+    environmentSetup: [
+      "Study at a desk only — no studying on bed or sofa",
+      "Clear desk of everything except study material",
+      "Use noise-cancelling headphones or brown noise during sessions",
+      "Notify family of study hours to prevent interruptions",
+    ],
+    emergencyProtocol: "If you pick up your phone mid-session, restart the entire session from scratch — no exceptions.",
+    phonePolicy: "Phone is locked away during all study blocks. Checked only during scheduled breaks. Social media deleted from phone; accessed only via desktop with time limits.",
+  },
+  resources: {
+    books: [
+      { title: "Mathematics for JEE — NCERT + DC Pandey", reason: "Builds concepts rigorously before advanced problem solving" },
+      { title: "HC Verma — Concepts of Physics", reason: "Best conceptual foundation for JEE Physics" },
+      { title: "Physical Chemistry — OP Tandon", reason: "Clear explanations with graded problems" },
+      { title: "Atomic Habits", author: "James Clear", reason: "Understand how to build the study habits that will actually stick" },
+    ],
+    podcasts: [
+      { title: "The Knowledge Project", reason: "Mental models and decision-making for peak performance" },
+    ],
+    techniques: [
+      { name: "Active Recall", description: "Close the book and retrieve information from memory", howToUse: "After each section, write or say everything you remember before checking" },
+      { name: "Spaced Repetition", description: "Review material at increasing time intervals", howToUse: "Use Anki or a physical card system — review at 1 day, 3 days, 7 days, 14 days" },
+      { name: "Feynman Technique", description: "Explain the concept as if teaching a 12-year-old", howToUse: "Write the concept name, explain it simply, identify gaps, go back to source" },
+      { name: "Pomodoro (modified)", description: "90-minute deep work blocks with 15-minute breaks", howToUse: "Work for 90 minutes uninterrupted, then take a real break — no phone" },
+    ],
+    tools: [
+      { name: "Anki", purpose: "Spaced repetition flashcards for Chemistry and Physics formulas", free: true },
+      { name: "Cold Turkey", purpose: "Block distracting websites and apps during study hours", free: false },
+      { name: "Notion", purpose: "Organise notes, track weekly reviews, plan sessions", free: true },
+      { name: "Forest App", purpose: "Phone lock timer to stay off phone during sessions", free: false },
+    ],
+  },
+  weeklyReview: {
+    checklistItems: [
+      "Did I complete all planned study blocks this week?",
+      "Which topics did I actively recall vs passively re-read?",
+      "What are the 3 biggest gaps I discovered this week?",
+      "Did I stick to my phone and distraction rules?",
+      "Are my habit streaks on track?",
+      "What will I do differently next week?",
+    ],
+    progressMetrics: [
+      { metric: "Study blocks completed", target: 28, current: 0, unit: "blocks" },
+      { metric: "Weekly study hours", target: 36, current: 0, unit: "hours" },
+      { metric: "Habits completed daily", target: 6, current: 0, unit: "habits/day" },
+      { metric: "Mock test score", target: 75, current: 60, unit: "%" },
+    ],
+    reviewQuestions: [
+      "Where did I lose focus this week, and why?",
+      "Which study method gave me the best retention?",
+      "Am I on track for JEE Advanced 2025?",
+    ],
+  },
+  meta: {
+    generatedAt: new Date().toISOString(),
+    studentName: "Maneesh Awasthi",
+    planVersion: 1,
+  },
+};
+// ──────────────────────────────────────────────────────────────────────────────
 
 function getTodayName() {
   return new Date().toLocaleDateString("en-US", { weekday: "long" });
@@ -38,18 +249,32 @@ export default function DashboardPage() {
   const [todayHabits, setTodayHabits] = useState<Habit[]>([]);
 
   useEffect(() => {
-    if (!isOnboarded || !studentProfile) {
-      router.push("/onboarding");
-      return;
-    }
-    if (!masterPlan) {
-      router.push("/generating");
-      return;
-    }
+    if (!masterPlan || !studentProfile || !isOnboarded) return;
     setTodayHabits(masterPlan.habitSystem.filter((h) => h.frequency === "daily"));
-  }, [isOnboarded, studentProfile, masterPlan, router]);
+  }, [isOnboarded, studentProfile, masterPlan]);
 
-  if (!masterPlan || !studentProfile) return null;
+  function loadTestData() {
+    store.setStudentProfile(MOCK_PROFILE);
+    store.setMasterPlan(MOCK_PLAN);
+    store.setIsOnboarded(true);
+  }
+
+  if (!masterPlan || !studentProfile) {
+    return (
+      <div style={{
+        minHeight: "100vh", background: "#0a0a0a",
+        display: "flex", alignItems: "center", justifyContent: "center",
+      }}>
+        <button type="button" onClick={loadTestData} style={{
+          padding: "0.5rem 1rem", fontSize: "0.75rem", color: "#aaa",
+          background: "#161616", border: "1px solid #333", borderRadius: "8px",
+          cursor: "pointer", fontFamily: "monospace", letterSpacing: "0.03em",
+        }}>
+          [dev] load test data
+        </button>
+      </div>
+    );
+  }
 
   const todayName = getTodayName();
   const todayDay = masterPlan.weeklySchedule.find((d) => d.day === todayName);
@@ -292,6 +517,20 @@ export default function DashboardPage() {
         </div>
 
       </div>
+
+      {/* DEV: reload test data — fixed bottom-right corner */}
+      <button type="button" onClick={loadTestData} style={{
+        position: "fixed", bottom: "1rem", right: "1rem",
+        padding: "0.3rem 0.65rem", fontSize: "0.68rem", color: "#666",
+        background: "#111", border: "1px solid #2a2a2a", borderRadius: "6px",
+        cursor: "pointer", fontFamily: "monospace", opacity: 0.6,
+        zIndex: 9999, transition: "opacity 0.15s",
+      }}
+        onMouseEnter={(e) => { (e.currentTarget).style.opacity = "1"; (e.currentTarget).style.color = "#aaa"; }}
+        onMouseLeave={(e) => { (e.currentTarget).style.opacity = "0.6"; (e.currentTarget).style.color = "#666"; }}
+      >
+        [dev] load test data
+      </button>
     </div>
   );
 }
