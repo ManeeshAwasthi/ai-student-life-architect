@@ -7,7 +7,8 @@ import {
   buildStrategyPrompt,
   buildDailyRoutinePrompt,
   buildWeeklySchedulePrompt,
-  buildSystemsPrompt,
+  buildHabitSystemPrompt,
+  buildDistractionControlPrompt,
   buildResourcesPrompt,
   buildWeeklyReviewPrompt,
 } from "@/lib/prompts";
@@ -119,77 +120,56 @@ export async function POST(request: NextRequest) {
             throw new Error(`Strategy step failed: ${msg}`);
           }
 
-          // ── Step 3: Schedule (daily routine + weekly schedule in parallel) ─
+          // ── Steps 3-6: All parallel (schedule, systems, resources, review) ─
           send({ step: "schedule", status: "active" });
-          let schedule: { dailyRoutine: MasterPlan["dailyRoutine"]; weeklySchedule: MasterPlan["weeklySchedule"] };
-          try {
-            console.log("[generate-plan] Step 3/6 — schedule (parallel)");
-            const [routineResult, weeklyResult] = await Promise.all([
-              callGemini(buildDailyRoutinePrompt(profile, strategy), "dailyRoutine") as Promise<{ dailyRoutine: MasterPlan["dailyRoutine"] }>,
-              callGemini(buildWeeklySchedulePrompt(profile, strategy), "weeklySchedule") as Promise<{ weeklySchedule: MasterPlan["weeklySchedule"] }>,
-            ]);
-            schedule = {
-              dailyRoutine: (routineResult as { dailyRoutine: MasterPlan["dailyRoutine"] }).dailyRoutine,
-              weeklySchedule: (weeklyResult as { weeklySchedule: MasterPlan["weeklySchedule"] }).weeklySchedule,
-            };
-            send({ step: "schedule", status: "complete" });
-            console.log("[generate-plan] ✓ Step 3/6 schedule complete");
-          } catch (err) {
-            const msg = err instanceof Error ? err.message : String(err);
-            console.error(`[generate-plan] ✗ Step 3/6 schedule FAILED: ${msg}`);
-            throw new Error(`Schedule step failed: ${msg}`);
-          }
-
-          // ── Step 4: Systems ────────────────────────────────────────────────
           send({ step: "systems", status: "active" });
-          let systems: { habitSystem: MasterPlan["habitSystem"]; distractionControl: MasterPlan["distractionControl"] };
-          try {
-            console.log("[generate-plan] Step 4/6 — systems");
-            systems = await callGemini(buildSystemsPrompt(profile, diagnosis, strategy), "systems") as typeof systems;
-            send({ step: "systems", status: "complete" });
-            console.log("[generate-plan] ✓ Step 4/6 systems complete");
-          } catch (err) {
-            const msg = err instanceof Error ? err.message : String(err);
-            console.error(`[generate-plan] ✗ Step 4/6 systems FAILED: ${msg}`);
-            throw new Error(`Systems step failed: ${msg}`);
-          }
-
-          // ── Step 5: Resources ──────────────────────────────────────────────
           send({ step: "resources", status: "active" });
-          let resources: MasterPlan["resources"];
-          try {
-            console.log("[generate-plan] Step 5/6 — resources");
-            resources = await callGemini(buildResourcesPrompt(profile), "resources") as MasterPlan["resources"];
-            send({ step: "resources", status: "complete" });
-            console.log("[generate-plan] ✓ Step 5/6 resources complete");
-          } catch (err) {
-            const msg = err instanceof Error ? err.message : String(err);
-            console.error(`[generate-plan] ✗ Step 5/6 resources FAILED: ${msg}`);
-            throw new Error(`Resources step failed: ${msg}`);
-          }
-
-          // ── Step 6: Weekly Review ──────────────────────────────────────────
           send({ step: "review", status: "active" });
+
+          let dailyRoutine: MasterPlan["dailyRoutine"];
+          let weeklySchedule: MasterPlan["weeklySchedule"];
+          let habitSystem: MasterPlan["habitSystem"];
+          let distractionControl: MasterPlan["distractionControl"];
+          let resources: MasterPlan["resources"];
           let weeklyReview: MasterPlan["weeklyReview"];
+
           try {
-            console.log("[generate-plan] Step 6/6 — weeklyReview");
-            weeklyReview = await callGemini(buildWeeklyReviewPrompt(profile), "weeklyReview") as MasterPlan["weeklyReview"];
+            console.log("[generate-plan] Steps 3-6 — running 6 calls in parallel");
+            const [routineRes, weeklyRes, habitRes, distractionRes, resourcesRes, reviewRes] = await Promise.all([
+              callGemini(buildDailyRoutinePrompt(profile, strategy), "dailyRoutine"),
+              callGemini(buildWeeklySchedulePrompt(profile, strategy), "weeklySchedule"),
+              callGemini(buildHabitSystemPrompt(profile, diagnosis, strategy), "habitSystem"),
+              callGemini(buildDistractionControlPrompt(profile, diagnosis), "distractionControl"),
+              callGemini(buildResourcesPrompt(profile), "resources"),
+              callGemini(buildWeeklyReviewPrompt(profile), "weeklyReview"),
+            ]);
+
+            dailyRoutine = (routineRes as { dailyRoutine: MasterPlan["dailyRoutine"] }).dailyRoutine;
+            weeklySchedule = (weeklyRes as { weeklySchedule: MasterPlan["weeklySchedule"] }).weeklySchedule;
+            habitSystem = (habitRes as { habitSystem: MasterPlan["habitSystem"] }).habitSystem;
+            distractionControl = (distractionRes as { distractionControl: MasterPlan["distractionControl"] }).distractionControl;
+            resources = resourcesRes as MasterPlan["resources"];
+            weeklyReview = reviewRes as MasterPlan["weeklyReview"];
+
+            console.log("[generate-plan] ✓ Steps 3-6 complete");
+            send({ step: "schedule", status: "complete" });
+            send({ step: "systems", status: "complete" });
+            send({ step: "resources", status: "complete" });
             send({ step: "review", status: "complete" });
-            console.log("[generate-plan] ✓ Step 6/6 weeklyReview complete");
           } catch (err) {
             const msg = err instanceof Error ? err.message : String(err);
-            console.error(`[generate-plan] ✗ Step 6/6 weeklyReview FAILED: ${msg}`);
-            throw new Error(`Weekly review step failed: ${msg}`);
+            console.error(`[generate-plan] ✗ Steps 3-6 FAILED: ${msg}`);
+            throw new Error(`Plan generation failed: ${msg}`);
           }
 
           // ── Assemble ──────────────────────────────────────────────────────
           const masterPlan: MasterPlan = {
             diagnosis,
             strategy,
-            dailyRoutine: schedule.dailyRoutine,
-            weeklySchedule: schedule.weeklySchedule,
-            habitSystem: systems.habitSystem,
-            distractionControl: systems.distractionControl,
+            dailyRoutine,
+            weeklySchedule,
+            habitSystem,
+            distractionControl,
             resources,
             weeklyReview,
             meta: {

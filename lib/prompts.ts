@@ -117,16 +117,14 @@ Return ONLY this JSON:
 Include all 7 days (Monday through Sunday). At least 1 full rest day with isRestDay: true and empty blocks array. Schedule deep work at energy peak time.`;
 }
 
-export function buildSystemsPrompt(
+export function buildHabitSystemPrompt(
   profile: StudentProfile,
   diagnosis: Diagnosis,
   strategy: Strategy
 ): string {
-  return `Design a habit system and distraction control plan.
+  return `Design a habit system for this student.
 
 Distractions: ${profile.biggestDistractions.join(", ")}
-Social media: ${profile.socialMediaApps.join(", ")}
-Screen time: ${profile.screenTimePerDay}h/day
 Procrastination: ${profile.procrastinationLevel}/5
 Problems: ${diagnosis.primaryProblems.join(", ")}
 Study method: ${strategy.primaryStudyMethod}
@@ -144,7 +142,25 @@ Return ONLY this JSON:
       "completedToday": false,
       "completionHistory": []
     }
-  ],
+  ]
+}
+Create 8-10 habits. Make them specific, not generic.`;
+}
+
+export function buildDistractionControlPrompt(
+  profile: StudentProfile,
+  diagnosis: Diagnosis
+): string {
+  return `Design a distraction control plan for this student.
+
+Distractions: ${profile.biggestDistractions.join(", ")}
+Social media: ${profile.socialMediaApps.join(", ")}
+Screen time: ${profile.screenTimePerDay}h/day
+Procrastination: ${profile.procrastinationLevel}/5
+Problems: ${diagnosis.primaryProblems.join(", ")}
+
+Return ONLY this JSON:
+{
   "distractionControl": {
     "topDistractions": ["distraction1"],
     "blockingRules": ["rule1", "rule2"],
@@ -152,8 +168,7 @@ Return ONLY this JSON:
     "emergencyProtocol": "What to do when urge hits",
     "phonePolicy": "Specific phone policy"
   }
-}
-Create 8-10 habits. Make them specific, not generic.`;
+}`;
 }
 
 export function buildResourcesPrompt(profile: StudentProfile): string {

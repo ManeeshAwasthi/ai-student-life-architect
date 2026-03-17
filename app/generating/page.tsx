@@ -72,17 +72,17 @@ export default function GeneratingPage() {
     hasFetched.current = true;
 
     const generate = async () => {
-      // 90-second safety timeout — shows error if nothing completes
+      // 180-second safety timeout — shows error if nothing completes
       const abortController = new AbortController();
       const timeoutId = setTimeout(() => {
         abortController.abort();
-        console.error("[generating] 90s timeout — aborting");
+        console.error("[generating] 180s timeout — aborting");
         setHasError(true);
-        setErrorMessage("Generation timed out after 90 seconds. Please try again.");
+        setErrorMessage("Generation timed out after 3 minutes. Please try again.");
         setSteps((prev) =>
           prev.map((s) => (s.status === "active" ? { ...s, status: "error" } : s))
         );
-      }, 90_000);
+      }, 180_000);
 
       try {
         const response = await fetch("/api/generate-plan", {
@@ -260,7 +260,7 @@ export default function GeneratingPage() {
 
         {!hasError && (
           <p style={{ textAlign: "center", color: "#333", fontSize: "0.72rem", marginTop: "2rem", marginBottom: 0 }}>
-            Making 6 separate analyses to build your complete system. Please keep this tab open.
+            Running analyses in parallel to build your complete system. Please keep this tab open.
           </p>
         )}
       </div>
