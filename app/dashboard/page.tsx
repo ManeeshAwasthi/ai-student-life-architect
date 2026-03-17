@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState, useRef } from "react";
-import { useRouter, usePathname } from "next/navigation";
+import { useRouter } from "next/navigation";
 import { useAppStore } from "@/lib/store";
 import type { Habit, StudentProfile, MasterPlan } from "@/lib/types";
 
@@ -56,7 +56,7 @@ const MOCK_PLAN: MasterPlan = {
   strategy: {
     primaryStudyMethod: "Active Recall + Spaced Repetition",
     primaryMethodDescription:
-      "Close the book after reading each section and write down everything you remember. Review using flashcards at increasing intervals (1 day, 3 days, 7 days). This forces your brain to retrieve information rather than passively re-read it.",
+      "Close the book after reading each section and write down everything you remember. Review using flashcards at increasing intervals.",
     secondaryMethod: "Feynman Technique",
     subjects: [
       { subject: "Mathematics", priority: "high", weeklyHours: 14, reason: "Highest scoring potential, needs daily practice", recommendedMethod: "Problem sets with active recall" },
@@ -90,7 +90,6 @@ const MOCK_PLAN: MasterPlan = {
         { id: "b1", time: "06:30", subject: "Mathematics", method: "Active Recall", durationMinutes: 90 },
         { id: "b2", time: "08:30", subject: "Physics", method: "Concept Mapping", durationMinutes: 90 },
         { id: "b3", time: "13:00", subject: "Chemistry", method: "Flashcards", durationMinutes: 90 },
-        { id: "b4", time: "19:00", subject: "Revision", method: "Spaced Repetition", durationMinutes: 90 },
       ],
     },
     {
@@ -99,7 +98,6 @@ const MOCK_PLAN: MasterPlan = {
         { id: "b5", time: "06:30", subject: "Physics", method: "Problem Solving", durationMinutes: 90 },
         { id: "b6", time: "08:30", subject: "Mathematics", method: "Problem Sets", durationMinutes: 90 },
         { id: "b7", time: "13:00", subject: "Chemistry", method: "Active Recall", durationMinutes: 90 },
-        { id: "b8", time: "19:00", subject: "Mathematics", method: "Revision", durationMinutes: 90 },
       ],
     },
     {
@@ -108,7 +106,6 @@ const MOCK_PLAN: MasterPlan = {
         { id: "b9", time: "06:30", subject: "Mathematics", method: "Active Recall", durationMinutes: 90 },
         { id: "b10", time: "08:30", subject: "Chemistry", method: "Problem Solving", durationMinutes: 90 },
         { id: "b11", time: "13:00", subject: "Physics", method: "Feynman Technique", durationMinutes: 90 },
-        { id: "b12", time: "19:00", subject: "Revision", method: "Spaced Repetition", durationMinutes: 90 },
       ],
     },
     {
@@ -117,7 +114,6 @@ const MOCK_PLAN: MasterPlan = {
         { id: "b13", time: "06:30", subject: "Physics", method: "Active Recall", durationMinutes: 90 },
         { id: "b14", time: "08:30", subject: "Mathematics", method: "Problem Sets", durationMinutes: 90 },
         { id: "b15", time: "13:00", subject: "Chemistry", method: "Flashcards", durationMinutes: 90 },
-        { id: "b16", time: "19:00", subject: "Mathematics", method: "Revision", durationMinutes: 90 },
       ],
     },
     {
@@ -126,7 +122,6 @@ const MOCK_PLAN: MasterPlan = {
         { id: "b17", time: "06:30", subject: "Mathematics", method: "Mock Test", durationMinutes: 90 },
         { id: "b18", time: "08:30", subject: "Physics", method: "Mock Test", durationMinutes: 90 },
         { id: "b19", time: "13:00", subject: "Chemistry", method: "Mock Test", durationMinutes: 90 },
-        { id: "b20", time: "19:00", subject: "Revision", method: "Full Review", durationMinutes: 90 },
       ],
     },
     {
@@ -134,78 +129,66 @@ const MOCK_PLAN: MasterPlan = {
       blocks: [
         { id: "b21", time: "09:00", subject: "Mathematics", method: "Problem Solving", durationMinutes: 120 },
         { id: "b22", time: "13:00", subject: "Physics", method: "Problem Solving", durationMinutes: 120 },
-        { id: "b23", time: "19:00", subject: "Weekly Review", method: "Spaced Repetition", durationMinutes: 90 },
       ],
     },
     { day: "Sunday", isRestDay: true, blocks: [] },
   ],
   habitSystem: [
-    { id: "h1", habit: "No phone for first 30 minutes after waking", frequency: "daily", category: "lifestyle", whyItMatters: "Sets a focused tone; breaks the dopamine-first-thing cycle", streak: 0, completedToday: false, completionHistory: [] },
-    { id: "h2", habit: "Complete at least 3 study blocks", frequency: "daily", category: "study", whyItMatters: "Non-negotiable daily minimum to stay on track for JEE", streak: 0, completedToday: false, completionHistory: [] },
-    { id: "h3", habit: "Active recall on one topic before moving on", frequency: "daily", category: "study", whyItMatters: "Prevents passive reading trap; forces real understanding", streak: 0, completedToday: false, completionHistory: [] },
-    { id: "h4", habit: "Phone in another room during study blocks", frequency: "daily", category: "focus", whyItMatters: "Even phone presence reduces cognitive capacity by 10%", streak: 0, completedToday: false, completionHistory: [] },
-    { id: "h5", habit: "Write daily review (3 things learned today)", frequency: "daily", category: "mindset", whyItMatters: "Reinforces memory and builds metacognitive awareness", streak: 0, completedToday: false, completionHistory: [] },
-    { id: "h6", habit: "30-minute exercise or walk", frequency: "daily", category: "health", whyItMatters: "Increases BDNF — directly improves memory and focus", streak: 0, completedToday: false, completionHistory: [] },
-    { id: "h7", habit: "Weekly mock test (1 subject)", frequency: "weekly", category: "study", whyItMatters: "Simulates exam pressure and reveals actual gaps", streak: 0, completedToday: false, completionHistory: [] },
+    { id: "h1", habit: "No phone for first 30 mins after waking", frequency: "daily", category: "lifestyle", whyItMatters: "Breaks the dopamine-first-thing cycle", streak: 0, completedToday: false, completionHistory: [] },
+    { id: "h2", habit: "Complete at least 3 study blocks", frequency: "daily", category: "study", whyItMatters: "Non-negotiable daily minimum for JEE", streak: 0, completedToday: false, completionHistory: [] },
+    { id: "h3", habit: "Active recall on one topic before moving on", frequency: "daily", category: "study", whyItMatters: "Prevents passive reading trap", streak: 0, completedToday: false, completionHistory: [] },
+    { id: "h4", habit: "Phone in another room during study blocks", frequency: "daily", category: "focus", whyItMatters: "Even phone presence reduces focus by 10%", streak: 0, completedToday: false, completionHistory: [] },
+    { id: "h5", habit: "Write daily review (3 things learned)", frequency: "daily", category: "mindset", whyItMatters: "Reinforces memory and builds metacognition", streak: 0, completedToday: false, completionHistory: [] },
+    { id: "h6", habit: "30-minute exercise or walk", frequency: "daily", category: "health", whyItMatters: "BDNF directly improves memory and focus", streak: 0, completedToday: false, completionHistory: [] },
+    { id: "h7", habit: "Weekly mock test (1 subject)", frequency: "weekly", category: "study", whyItMatters: "Simulates exam pressure, reveals actual gaps", streak: 0, completedToday: false, completionHistory: [] },
   ],
   distractionControl: {
     topDistractions: ["Phone", "YouTube", "Instagram"],
     blockingRules: [
       "Phone stays in a separate room during all study blocks",
-      "Use app blockers (Cold Turkey / BlockSite) for YouTube and Instagram from 6am–5pm",
-      "Only 1 hour of screen time allowed after 8pm — set a hard timer",
+      "Use app blockers for YouTube and Instagram from 6am–5pm",
+      "Only 1 hour of screen time allowed after 8pm",
     ],
     environmentSetup: [
       "Study at a desk only — no studying on bed or sofa",
       "Clear desk of everything except study material",
-      "Use noise-cancelling headphones or brown noise during sessions",
-      "Notify family of study hours to prevent interruptions",
+      "Use noise-cancelling headphones or brown noise",
     ],
-    emergencyProtocol: "If you pick up your phone mid-session, restart the entire session from scratch — no exceptions.",
-    phonePolicy: "Phone is locked away during all study blocks. Checked only during scheduled breaks. Social media deleted from phone; accessed only via desktop with time limits.",
+    emergencyProtocol: "If you pick up your phone mid-session, restart the entire session from scratch.",
+    phonePolicy: "Phone is locked away during all study blocks. Checked only during scheduled breaks.",
   },
   resources: {
     books: [
       { title: "Mathematics for JEE — NCERT + DC Pandey", reason: "Builds concepts rigorously before advanced problem solving" },
       { title: "HC Verma — Concepts of Physics", reason: "Best conceptual foundation for JEE Physics" },
-      { title: "Physical Chemistry — OP Tandon", reason: "Clear explanations with graded problems" },
-      { title: "Atomic Habits", author: "James Clear", reason: "Understand how to build the study habits that will actually stick" },
+      { title: "Atomic Habits", author: "James Clear", reason: "Understand how to build the study habits that actually stick" },
     ],
     podcasts: [
       { title: "The Knowledge Project", reason: "Mental models and decision-making for peak performance" },
     ],
     techniques: [
-      { name: "Active Recall", description: "Close the book and retrieve information from memory", howToUse: "After each section, write or say everything you remember before checking" },
-      { name: "Spaced Repetition", description: "Review material at increasing time intervals", howToUse: "Use Anki or a physical card system — review at 1 day, 3 days, 7 days, 14 days" },
-      { name: "Feynman Technique", description: "Explain the concept as if teaching a 12-year-old", howToUse: "Write the concept name, explain it simply, identify gaps, go back to source" },
-      { name: "Pomodoro (modified)", description: "90-minute deep work blocks with 15-minute breaks", howToUse: "Work for 90 minutes uninterrupted, then take a real break — no phone" },
+      { name: "Active Recall", description: "Close the book and retrieve information from memory", howToUse: "After each section, write everything you remember before checking" },
+      { name: "Spaced Repetition", description: "Review material at increasing time intervals", howToUse: "Use Anki — review at 1 day, 3 days, 7 days, 14 days" },
     ],
     tools: [
-      { name: "Anki", purpose: "Spaced repetition flashcards for Chemistry and Physics formulas", free: true },
-      { name: "Cold Turkey", purpose: "Block distracting websites and apps during study hours", free: false },
-      { name: "Notion", purpose: "Organise notes, track weekly reviews, plan sessions", free: true },
-      { name: "Forest App", purpose: "Phone lock timer to stay off phone during sessions", free: false },
+      { name: "Anki", purpose: "Spaced repetition flashcards for Chemistry and Physics", free: true },
+      { name: "Cold Turkey", purpose: "Block distracting websites during study hours", free: false },
     ],
   },
   weeklyReview: {
     checklistItems: [
       "Did I complete all planned study blocks this week?",
       "Which topics did I actively recall vs passively re-read?",
-      "What are the 3 biggest gaps I discovered this week?",
       "Did I stick to my phone and distraction rules?",
-      "Are my habit streaks on track?",
-      "What will I do differently next week?",
     ],
     progressMetrics: [
       { metric: "Study blocks completed", target: 28, current: 0, unit: "blocks" },
       { metric: "Weekly study hours", target: 36, current: 0, unit: "hours" },
-      { metric: "Habits completed daily", target: 6, current: 0, unit: "habits/day" },
       { metric: "Mock test score", target: 75, current: 60, unit: "%" },
     ],
     reviewQuestions: [
       "Where did I lose focus this week, and why?",
       "Which study method gave me the best retention?",
-      "Am I on track for JEE Advanced 2025?",
     ],
   },
   meta: {
@@ -216,21 +199,21 @@ const MOCK_PLAN: MasterPlan = {
 };
 // ──────────────────────────────────────────────────────────────────────────────
 
-function getGreetingData() {
-  const h = new Date().getHours();
-  if (h >= 5 && h < 12) return { text: "Good morning", icon: "🌅" };
-  if (h >= 12 && h < 17) return { text: "Good afternoon", icon: "☀️" };
-  if (h >= 17 && h < 21) return { text: "Good evening", icon: "🌆" };
-  return { text: "Good night", icon: "🌙" };
+function getGreeting(name: string): string {
+  const hour = new Date().getHours();
+  const first = name.split(" ")[0];
+  if (hour < 12) return `Good morning, ${first} ☀️`;
+  if (hour < 17) return `Good afternoon, ${first} 👋`;
+  return `Good evening, ${first} 🌙`;
 }
 
-function formatDate() {
+function getDateLabel(): string {
   return new Date().toLocaleDateString("en-US", {
     weekday: "long", day: "numeric", month: "long",
-  });
+  }).toUpperCase();
 }
 
-function useCountUp(target: number, duration = 1200) {
+function useCountUp(target: number, duration = 1000) {
   const [count, setCount] = useState(0);
   const startTime = useRef<number | null>(null);
   useEffect(() => {
@@ -247,40 +230,62 @@ function useCountUp(target: number, duration = 1200) {
   return count;
 }
 
-const subjectColors: Record<string, { bg: string; accent: string }> = {
-  Mathematics: { bg: "rgba(139,92,246,0.15)", accent: "#8b5cf6" },
-  Physics: { bg: "rgba(59,130,246,0.15)", accent: "#3b82f6" },
-  Chemistry: { bg: "rgba(16,185,129,0.15)", accent: "#10b981" },
-  Revision: { bg: "rgba(245,158,11,0.15)", accent: "#f59e0b" },
-  default: { bg: "rgba(124,58,237,0.12)", accent: "#7c3aed" },
+const HABIT_ICONS: Record<string, string> = {
+  lifestyle: "🌅", study: "📚", focus: "🎯", mindset: "🧠", health: "💪",
 };
+
+const SUBJECT_COLORS: Record<string, string> = {
+  Mathematics: "#6c63ff",
+  Physics: "#00d4aa",
+  Chemistry: "#ff6b9d",
+  Revision: "#ffb347",
+  default: "#6c63ff",
+};
+
+const QUICK_NAV = [
+  { label: "My Plan", emoji: "📋", path: "/plan",     color: "#6c63ff", desc: "Full blueprint" },
+  { label: "Schedule", emoji: "📅", path: "/schedule", color: "#00d4aa", desc: "This week" },
+  { label: "Coach",    emoji: "💬", path: "/coach",    color: "#ff6b9d", desc: "Ask anything" },
+  { label: "Progress", emoji: "📈", path: "/progress", color: "#ffb347", desc: "Track it" },
+];
 
 export default function DashboardPage() {
   const router = useRouter();
-  const pathname = usePathname();
   const store = useAppStore();
 
   const studentProfile = store.studentProfile;
-  const masterPlan = store.masterPlan;
-  const isOnboarded = store.isOnboarded;
+  const masterPlan     = store.masterPlan;
   const habitCompletions = store.habitCompletions;
-  const currentStreak = store.currentStreak;
+  const currentStreak  = store.currentStreak;
   const studyHoursToday = store.studyHoursToday;
-  const toggleHabit = store.toggleHabit;
+  const toggleHabit    = store.toggleHabit;
 
   const [todayHabits, setTodayHabits] = useState<Habit[]>([]);
-  const [greeting, setGreeting] = useState({ text: "Welcome", icon: "👋" });
-  const [mounted, setMounted] = useState(false);
+  const [greeting, setGreeting]       = useState("");
+  const [dateLabel, setDateLabel]     = useState("");
+  const [mounted, setMounted]         = useState(false);
+  const [isMobile, setIsMobile]       = useState(false);
 
   useEffect(() => {
-    setGreeting(getGreetingData());
-    setMounted(true);
+    const check = () => setIsMobile(window.innerWidth < 640);
+    check();
+    window.addEventListener("resize", check);
+    return () => window.removeEventListener("resize", check);
   }, []);
 
   useEffect(() => {
-    if (!masterPlan || !studentProfile || !isOnboarded) return;
+    setMounted(true);
+    setDateLabel(getDateLabel());
+  }, []);
+
+  useEffect(() => {
+    if (studentProfile) setGreeting(getGreeting(studentProfile.name));
+  }, [studentProfile]);
+
+  useEffect(() => {
+    if (!masterPlan) return;
     setTodayHabits(masterPlan.habitSystem.filter((h) => h.frequency === "daily"));
-  }, [isOnboarded, studentProfile, masterPlan]);
+  }, [masterPlan]);
 
   function loadTestData() {
     store.setStudentProfile(MOCK_PROFILE);
@@ -288,495 +293,287 @@ export default function DashboardPage() {
     store.setIsOnboarded(true);
   }
 
-  const streakCount = useCountUp(currentStreak, 800);
+  const streakCount = useCountUp(currentStreak, 900);
 
   if (!masterPlan || !studentProfile) {
     return (
-      <div style={{ minHeight: "100vh", background: "#050508", display: "flex", alignItems: "center", justifyContent: "center" }}>
+      <div style={{ minHeight: "100vh", background: "#080810", display: "flex", alignItems: "center", justifyContent: "center", flexDirection: "column", gap: "16px" }}>
+        <div style={{ width: "36px", height: "36px", border: "3px solid #1e1e35", borderTop: "3px solid #6c63ff", borderRadius: "50%", animation: "spin 0.8s linear infinite" }} />
         <button type="button" onClick={loadTestData} style={{
-          padding: "0.5rem 1rem", fontSize: "0.75rem", color: "#aaa",
-          background: "#161616", border: "1px solid #333", borderRadius: "8px",
-          cursor: "pointer", fontFamily: "monospace", letterSpacing: "0.03em",
-        }}>
-          [dev] load test data
-        </button>
+          padding: "8px 18px", fontSize: "12px", color: "#8888aa",
+          background: "#12121e", border: "1px solid #1e1e35", borderRadius: "8px",
+          cursor: "pointer", fontFamily: "'DM Mono', monospace", letterSpacing: "0.03em",
+          marginTop: "8px",
+        }}>[dev] load test data</button>
       </div>
     );
   }
 
-  const todayName = new Date().toLocaleDateString("en-US", { weekday: "long" });
-  const todayDay = masterPlan.weeklySchedule.find((d) => d.day === todayName);
-  const isRestDay = todayDay?.isRestDay ?? false;
+  const todayName     = new Date().toLocaleDateString("en-US", { weekday: "long" });
+  const todayDay      = masterPlan.weeklySchedule.find((d) => d.day === todayName);
+  const isRestDay     = todayDay?.isRestDay ?? false;
   const todaySchedule = todayDay?.blocks ?? [];
 
   const completedHabits = todayHabits.filter((h) => habitCompletions[h.id]).length;
-  const habitPercent = todayHabits.length > 0 ? Math.round((completedHabits / todayHabits.length) * 100) : 0;
+  const habitPercent    = todayHabits.length > 0 ? Math.round((completedHabits / todayHabits.length) * 100) : 0;
 
-  const urgencyColors: Record<string, string> = {
-    low: "#4ade80", medium: "#facc15", high: "#fb923c", critical: "#f87171",
-  };
-  const urgencyGlow: Record<string, string> = {
-    low: "rgba(74,222,128,0.15)", medium: "rgba(250,204,21,0.15)",
-    high: "rgba(251,146,60,0.15)", critical: "rgba(248,113,113,0.15)",
-  };
+  const focusScore = Math.min(100, Math.round(
+    (completedHabits / Math.max(todayHabits.length, 1)) * 60 +
+    Math.min(studyHoursToday / 6, 1) * 40
+  ));
 
-  const navItems = [
-    { label: "Plan", path: "/plan", icon: "📋" },
-    { label: "Schedule", path: "/schedule", icon: "📅" },
-    { label: "Coach", path: "/coach", icon: "💬" },
-    { label: "Progress", path: "/progress", icon: "📈" },
-  ];
+  const subline = `${todaySchedule.length} study blocks planned · ${habitPercent}% habits done`;
 
   return (
     <>
       <style>{`
-        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=Playfair+Display:wght@700;900&display=swap');
-
-        * { box-sizing: border-box; }
-
-        @keyframes fadeInUp {
-          from { opacity: 0; transform: translateY(20px); }
-          to { opacity: 1; transform: translateY(0); }
-        }
-        @keyframes fadeIn {
-          from { opacity: 0; }
-          to { opacity: 1; }
-        }
-        @keyframes slideDown {
-          from { opacity: 0; transform: translateY(-12px); }
-          to { opacity: 1; transform: translateY(0); }
-        }
-        @keyframes pulse-glow {
-          0%, 100% { box-shadow: 0 0 0 0 rgba(167,139,250,0); }
-          50% { box-shadow: 0 0 16px 4px rgba(167,139,250,0.18); }
-        }
-        @keyframes orb1 {
-          0%, 100% { transform: translate(0, 0) scale(1); }
-          33% { transform: translate(60px, -40px) scale(1.1); }
-          66% { transform: translate(-30px, 50px) scale(0.95); }
-        }
-        @keyframes orb2 {
-          0%, 100% { transform: translate(0, 0) scale(1); }
-          33% { transform: translate(-50px, 60px) scale(1.05); }
-          66% { transform: translate(40px, -30px) scale(1.12); }
-        }
-        @keyframes shimmer {
-          0% { background-position: -200% center; }
-          100% { background-position: 200% center; }
-        }
-        @keyframes streak-pulse {
-          0%, 100% { transform: scale(1); }
-          50% { transform: scale(1.08); }
-        }
-        @keyframes progress-fill {
-          from { width: 0%; }
-        }
-        @keyframes check-pop {
-          0% { transform: scale(0); }
-          60% { transform: scale(1.2); }
-          100% { transform: scale(1); }
-        }
-
-        .pm-nav-btn {
-          padding: 0.45rem 1rem;
-          background: rgba(255,255,255,0.04);
-          border: 1px solid rgba(255,255,255,0.08);
-          border-radius: 10px;
-          color: #888;
-          font-size: 0.8rem;
-          font-weight: 500;
-          cursor: pointer;
-          transition: all 0.2s cubic-bezier(0.4,0,0.2,1);
-          font-family: 'Inter', sans-serif;
-          letter-spacing: 0.01em;
-          position: relative;
-          overflow: hidden;
-        }
-        .pm-nav-btn::before {
-          content: '';
-          position: absolute;
-          inset: 0;
-          background: linear-gradient(135deg, rgba(167,139,250,0.1), rgba(236,72,153,0.06));
-          opacity: 0;
-          transition: opacity 0.2s;
-        }
-        .pm-nav-btn:hover {
-          border-color: rgba(167,139,250,0.45);
-          color: #c4b5fd;
-          background: rgba(124,58,237,0.12);
-          box-shadow: 0 0 12px rgba(124,58,237,0.2), 0 2px 8px rgba(0,0,0,0.3);
-          transform: translateY(-1px);
-        }
-        .pm-nav-btn:hover::before { opacity: 1; }
-        .pm-nav-btn:active { transform: translateY(0px) scale(0.97); }
-        .pm-nav-btn.active {
-          border-color: rgba(167,139,250,0.5);
-          color: #c4b5fd;
-          background: rgba(124,58,237,0.15);
-          box-shadow: 0 0 14px rgba(124,58,237,0.22);
-        }
-        .pm-nav-btn.active::before { opacity: 1; }
-
-        .pm-stat-card {
-          background: rgba(255,255,255,0.03);
-          border: 1px solid rgba(255,255,255,0.07);
+        .db-stat-card {
+          background: #12121e;
+          border: 1px solid #1e1e35;
           border-radius: 18px;
-          padding: 1.5rem;
-          text-align: center;
-          transition: all 0.3s cubic-bezier(0.4,0,0.2,1);
+          padding: 20px;
+          transition: all 0.25s ease;
           cursor: default;
-          position: relative;
-          overflow: hidden;
-          backdrop-filter: blur(8px);
         }
-        .pm-stat-card::before {
-          content: '';
-          position: absolute;
-          inset: 0;
-          background: radial-gradient(circle at 50% 0%, rgba(167,139,250,0.06), transparent 70%);
-          pointer-events: none;
+        .db-stat-card:hover {
+          border-color: rgba(108,99,255,0.3);
+          box-shadow: 0 8px 28px rgba(108,99,255,0.08);
+          transform: translateY(-2px);
         }
-        .pm-stat-card:hover {
-          border-color: rgba(167,139,250,0.25);
-          background: rgba(255,255,255,0.05);
-          transform: translateY(-3px);
-          box-shadow: 0 8px 32px rgba(0,0,0,0.4), 0 0 0 1px rgba(167,139,250,0.1);
-        }
-
-        .pm-glass-card {
-          background: rgba(255,255,255,0.025);
-          border: 1px solid rgba(255,255,255,0.07);
+        .db-card {
+          background: #12121e;
+          border: 1px solid #1e1e35;
           border-radius: 20px;
-          padding: 1.5rem;
-          transition: border-color 0.3s, box-shadow 0.3s;
-          backdrop-filter: blur(12px);
+          padding: 24px;
+          transition: all 0.25s ease;
         }
-        .pm-glass-card:hover {
-          border-color: rgba(167,139,250,0.18);
-          box-shadow: 0 4px 24px rgba(0,0,0,0.3);
+        .db-card:hover {
+          border-color: rgba(108,99,255,0.22);
+          box-shadow: 0 6px 24px rgba(108,99,255,0.07);
         }
-
-        .pm-schedule-block {
+        .db-habit-row {
           display: flex;
           align-items: center;
-          gap: 0.75rem;
-          padding: 0.7rem 0.9rem;
-          background: rgba(255,255,255,0.03);
+          gap: 10px;
+          padding: 10px 12px;
           border-radius: 12px;
-          border: 1px solid rgba(255,255,255,0.06);
-          transition: all 0.2s;
-        }
-        .pm-schedule-block:hover {
-          background: rgba(255,255,255,0.06);
-          border-color: rgba(167,139,250,0.2);
-          transform: translateX(3px);
-        }
-
-        .pm-habit-row {
-          display: flex;
-          align-items: center;
-          gap: 0.75rem;
-          padding: 0.65rem 0.85rem;
-          border-radius: 12px;
-          border: 1px solid rgba(255,255,255,0.06);
+          border: 1px solid #1e1e35;
           cursor: pointer;
-          transition: all 0.2s cubic-bezier(0.4,0,0.2,1);
+          transition: all 0.2s ease;
           user-select: none;
         }
-        .pm-habit-row:hover {
-          background: rgba(255,255,255,0.04) !important;
-          border-color: rgba(167,139,250,0.2) !important;
+        .db-habit-row:hover {
+          background: rgba(108,99,255,0.05);
+          border-color: rgba(108,99,255,0.2);
           transform: translateX(2px);
         }
-        .pm-habit-row:active { transform: scale(0.99); }
-
-        .pm-nav-card {
-          background: rgba(255,255,255,0.025);
-          border: 1px solid rgba(255,255,255,0.07);
-          border-radius: 16px;
-          padding: 1.25rem;
+        .db-habit-row:active { transform: scale(0.99); }
+        .db-sched-block {
+          display: flex;
+          align-items: flex-start;
+          gap: 12px;
+          padding: 12px 14px;
+          background: #0f0f1a;
+          border: 1px solid #1e1e35;
+          border-radius: 14px;
+          transition: all 0.2s ease;
+        }
+        .db-sched-block:hover {
+          border-color: rgba(108,99,255,0.25);
+          transform: translateX(3px);
+          background: rgba(108,99,255,0.04);
+        }
+        .db-quick-card {
+          background: #12121e;
+          border: 1px solid #1e1e35;
+          border-radius: 18px;
+          padding: 20px;
           cursor: pointer;
-          transition: all 0.25s cubic-bezier(0.4,0,0.2,1);
-          position: relative;
-          overflow: hidden;
+          transition: all 0.25s ease;
+          text-align: left;
         }
-        .pm-nav-card::after {
-          content: '';
-          position: absolute;
-          bottom: 0; left: 0; right: 0;
-          height: 2px;
-          background: linear-gradient(90deg, #7c3aed, #ec4899);
-          transform: scaleX(0);
-          transition: transform 0.3s;
-          transform-origin: left;
+        .db-quick-card:hover {
+          transform: translateY(-3px);
         }
-        .pm-nav-card:hover {
-          border-color: rgba(167,139,250,0.3);
-          background: rgba(124,58,237,0.08);
-          transform: translateY(-4px);
-          box-shadow: 0 12px 32px rgba(0,0,0,0.4), 0 0 0 1px rgba(167,139,250,0.15);
+        .db-problem-card {
+          background: #12121e;
+          border: 1px solid #1e1e35;
+          border-left: 3px solid #ff6b9d;
+          border-radius: 14px;
+          padding: 16px 18px;
+          transition: all 0.2s ease;
         }
-        .pm-nav-card:hover::after { transform: scaleX(1); }
-        .pm-nav-card:active { transform: translateY(-1px); }
-
-        .pm-insight-card {
-          background: rgba(255,255,255,0.025);
-          border-radius: 20px;
-          padding: 1.5rem;
-          transition: box-shadow 0.3s;
-          backdrop-filter: blur(12px);
+        .db-problem-card:hover {
+          border-color: rgba(255,107,157,0.4);
+          border-left-color: #ff6b9d;
+          background: rgba(255,107,157,0.03);
         }
-
-        .pm-streak-num {
-          animation: streak-pulse 2s ease-in-out infinite;
-          display: inline-block;
-        }
-
-        .stagger-1 { animation: fadeInUp 0.6s ease both; animation-delay: 0.05s; }
-        .stagger-2 { animation: fadeInUp 0.6s ease both; animation-delay: 0.12s; }
-        .stagger-3 { animation: fadeInUp 0.6s ease both; animation-delay: 0.19s; }
-        .stagger-4 { animation: fadeInUp 0.6s ease both; animation-delay: 0.26s; }
-        .stagger-5 { animation: fadeInUp 0.6s ease both; animation-delay: 0.33s; }
-        .stagger-6 { animation: fadeInUp 0.6s ease both; animation-delay: 0.40s; }
-        .stagger-7 { animation: fadeInUp 0.6s ease both; animation-delay: 0.47s; }
-
-        .nav-slide { animation: slideDown 0.4s ease both; }
-
-        .pm-progress-bar {
-          animation: progress-fill 1.2s ease both;
-          animation-delay: 0.5s;
-        }
-
-        .check-icon { animation: check-pop 0.25s cubic-bezier(0.34,1.56,0.64,1) both; }
       `}</style>
 
-      <div style={{
-        minHeight: "100vh",
-        background: "#050508",
-        fontFamily: "'Inter', sans-serif",
-        paddingBottom: "5rem",
-        position: "relative",
-        overflow: "hidden",
-      }}>
+      {/* Ambient background */}
+      <div style={{ position: "fixed", inset: 0, pointerEvents: "none", zIndex: 0 }}>
+        <div style={{ position: "absolute", top: "10%", left: "15%", width: "400px", height: "400px", borderRadius: "50%", background: "radial-gradient(circle, rgba(108,99,255,0.07) 0%, transparent 70%)", animation: "orb-drift 14s ease-in-out infinite" }} />
+        <div style={{ position: "absolute", bottom: "20%", right: "10%", width: "300px", height: "300px", borderRadius: "50%", background: "radial-gradient(circle, rgba(255,107,157,0.05) 0%, transparent 70%)", animation: "orb-drift 18s ease-in-out infinite reverse" }} />
+      </div>
 
-        {/* Animated background orbs */}
-        <div style={{ position: "fixed", inset: 0, pointerEvents: "none", zIndex: 0 }}>
-          <div style={{
-            position: "absolute", top: "10%", left: "15%",
-            width: "500px", height: "500px",
-            background: "radial-gradient(circle, rgba(124,58,237,0.08) 0%, transparent 70%)",
-            borderRadius: "50%",
-            animation: "orb1 18s ease-in-out infinite",
-          }} />
-          <div style={{
-            position: "absolute", top: "50%", right: "10%",
-            width: "400px", height: "400px",
-            background: "radial-gradient(circle, rgba(236,72,153,0.06) 0%, transparent 70%)",
-            borderRadius: "50%",
-            animation: "orb2 22s ease-in-out infinite",
-          }} />
-          <div style={{
-            position: "absolute", bottom: "15%", left: "40%",
-            width: "300px", height: "300px",
-            background: "radial-gradient(circle, rgba(59,130,246,0.05) 0%, transparent 70%)",
-            borderRadius: "50%",
-            animation: "orb1 26s ease-in-out infinite reverse",
-          }} />
-        </div>
+      <div style={{ minHeight: "100vh", background: "#080810", paddingBottom: "5rem", position: "relative", zIndex: 1 }}>
+        <div style={{ maxWidth: "1100px", margin: "0 auto", padding: isMobile ? "32px 16px 0" : "40px 32px 0" }}>
 
-        {/* Navbar */}
-        <div className="nav-slide" style={{
-          background: "rgba(5,5,8,0.85)",
-          borderBottom: "1px solid rgba(255,255,255,0.06)",
-          padding: "0.85rem 2rem",
-          display: "flex",
-          justifyContent: "space-between",
-          alignItems: "center",
-          position: "sticky",
-          top: 0,
-          zIndex: 100,
-          backdropFilter: "blur(20px)",
-          WebkitBackdropFilter: "blur(20px)",
-        }}>
-          <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
-            <div style={{
-              width: "28px", height: "28px",
-              background: "linear-gradient(135deg, #7c3aed, #ec4899)",
-              borderRadius: "8px",
-              display: "flex", alignItems: "center", justifyContent: "center",
-              fontSize: "0.85rem",
-            }}>⚡</div>
-            <span style={{
-              fontFamily: "'Playfair Display', serif",
-              fontSize: "1.1rem",
-              fontWeight: 900,
-              background: "linear-gradient(135deg, #a78bfa 0%, #ec4899 100%)",
-              WebkitBackgroundClip: "text",
-              WebkitTextFillColor: "transparent",
-              backgroundClip: "text",
-            }}>PeakMind</span>
-          </div>
-
-          <div style={{ display: "flex", gap: "0.5rem", alignItems: "center" }}>
-            {navItems.map((item) => (
-              <button
-                key={item.path}
-                type="button"
-                className={`pm-nav-btn${pathname === item.path ? " active" : ""}`}
-                onClick={() => router.push(item.path)}
-
-              >
-                <span style={{ marginRight: "0.35rem", fontSize: "0.75rem" }}>{item.icon}</span>
-                {item.label}
-              </button>
-            ))}
-          </div>
-        </div>
-
-        <div style={{ maxWidth: "920px", margin: "0 auto", padding: "2.5rem 1.5rem 0", position: "relative", zIndex: 1 }}>
-
-          {/* Header */}
-          <div className="stagger-1" style={{ marginBottom: "2.5rem" }}>
-            <p style={{ color: "#4a4a5a", fontSize: "0.8rem", margin: "0 0 0.3rem", letterSpacing: "0.04em" }}>
-              {mounted ? formatDate() : ""}
+          {/* ── Header ── */}
+          <div className="stagger-1" style={{ marginBottom: "36px" }}>
+            <p style={{ color: "#44445a", fontSize: "11px", fontFamily: "'DM Mono', monospace", letterSpacing: "0.08em", marginBottom: "8px" }}>
+              {mounted ? dateLabel : ""}
             </p>
             <h1 style={{
-              fontFamily: "'Playfair Display', serif",
-              fontSize: "clamp(1.8rem, 3.5vw, 2.4rem)",
-              fontWeight: 900,
-              margin: "0 0 0.5rem",
-              background: "linear-gradient(135deg, #ffffff 0%, #c4b5fd 60%, #f9a8d4 100%)",
-              WebkitBackgroundClip: "text",
-              WebkitTextFillColor: "transparent",
-              backgroundClip: "text",
-              lineHeight: 1.2,
+              fontFamily: "'Syne', sans-serif", fontWeight: 800,
+              fontSize: isMobile ? "clamp(1.6rem,6vw,2rem)" : "2.4rem",
+              color: "#f0f0ff", letterSpacing: "-0.03em", margin: "0 0 8px",
             }}>
-              {mounted ? greeting.text : "Welcome"}, {studentProfile.name.split(" ")[0]}{" "}
-              <span style={{ WebkitTextFillColor: "initial", WebkitBackgroundClip: "initial" }}>
-                {mounted ? greeting.icon : "👋"}
-              </span>
+              {mounted && greeting ? greeting : `Welcome back`}
             </h1>
-            <p style={{ color: "#4a4a5a", fontSize: "0.88rem", margin: 0 }}>
-              {isRestDay
-                ? "Today is a rest day. Recover well."
-                : `${todaySchedule.length} study blocks · ${todayHabits.length} habits to complete`}
+            <p style={{ color: "#8888aa", fontSize: "14px", margin: 0, fontFamily: "'DM Sans', sans-serif" }}>
+              {subline}
             </p>
           </div>
 
-          {/* Key insight banner */}
-          <div className="pm-insight-card stagger-2" style={{
-            marginBottom: "1.5rem",
-            border: `1px solid ${urgencyColors[masterPlan.diagnosis.urgencyLevel]}28`,
-            borderLeft: `3px solid ${urgencyColors[masterPlan.diagnosis.urgencyLevel]}`,
-            boxShadow: `0 0 30px ${urgencyGlow[masterPlan.diagnosis.urgencyLevel]}, inset 0 0 30px ${urgencyGlow[masterPlan.diagnosis.urgencyLevel]}`,
+          {/* ── Stats row ── */}
+          <div className="stagger-2" style={{
+            display: "grid",
+            gridTemplateColumns: isMobile ? "repeat(2,1fr)" : "repeat(4,1fr)",
+            gap: "12px", marginBottom: "24px",
           }}>
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: "1rem" }}>
-              <div>
-                <p style={{ color: "#4a4a5a", fontSize: "0.68rem", margin: "0 0 0.5rem", textTransform: "uppercase", letterSpacing: "0.1em", fontWeight: 600 }}>
-                  Your Key Insight
-                </p>
-                <p style={{ color: "#d4d4d8", fontSize: "0.9rem", margin: 0, lineHeight: 1.65 }}>
-                  {masterPlan.diagnosis.keyInsight}
-                </p>
+            {[
+              { label: "Day Streak",   value: streakCount,              unit: "days",   emoji: "🔥", color: "#ffb347", bg: "rgba(255,179,71,0.08)",  border: "rgba(255,179,71,0.18)"  },
+              { label: "Habits Done",  value: `${completedHabits}/${todayHabits.length}`, unit: "today",  emoji: "✅", color: "#00d4aa", bg: "rgba(0,212,170,0.07)", border: "rgba(0,212,170,0.18)"  },
+              { label: "Study Hours",  value: studyHoursToday.toFixed(1), unit: "hrs",   emoji: "⏱",  color: "#a594ff", bg: "rgba(108,99,255,0.08)", border: "rgba(108,99,255,0.2)"  },
+              { label: "Focus Score",  value: `${focusScore}%`,          unit: "today",  emoji: "⚡", color: "#ff6b9d", bg: "rgba(255,107,157,0.07)", border: "rgba(255,107,157,0.18)" },
+            ].map((s, i) => (
+              <div key={s.label} className="db-stat-card" style={{ background: s.bg, borderColor: s.border, animationDelay: `${i * 0.06}s` }}>
+                <div style={{ fontSize: "20px", marginBottom: "10px" }}>{s.emoji}</div>
+                <div style={{
+                  fontFamily: "'DM Mono', monospace", fontWeight: 700,
+                  fontSize: isMobile ? "1.8rem" : "2rem", color: s.color, lineHeight: 1,
+                  marginBottom: "4px",
+                }}>
+                  {typeof s.value === "number" ? s.value : s.value}
+                </div>
+                <div style={{ color: "#44445a", fontSize: "11px", fontFamily: "'DM Mono', monospace" }}>{s.unit}</div>
+                <div style={{ color: "#8888aa", fontSize: "12px", marginTop: "4px" }}>{s.label}</div>
               </div>
-              <span style={{
-                flexShrink: 0,
-                padding: "0.3rem 0.75rem",
-                borderRadius: "999px",
-                fontSize: "0.65rem",
-                fontWeight: 700,
-                textTransform: "uppercase",
-                letterSpacing: "0.08em",
-                background: `${urgencyColors[masterPlan.diagnosis.urgencyLevel]}18`,
-                color: urgencyColors[masterPlan.diagnosis.urgencyLevel],
-                border: `1px solid ${urgencyColors[masterPlan.diagnosis.urgencyLevel]}40`,
-                boxShadow: `0 0 10px ${urgencyColors[masterPlan.diagnosis.urgencyLevel]}25`,
-              }}>
-                {masterPlan.diagnosis.urgencyLevel}
-              </span>
-            </div>
+            ))}
           </div>
 
-          {/* Stats */}
-          <div className="stagger-3" style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: "1rem", marginBottom: "1.5rem" }}>
-            {/* Streak */}
-            <div className="pm-stat-card" style={{ borderColor: "rgba(167,139,250,0.15)" }}>
-              <div style={{ fontSize: "1.6rem", marginBottom: "0.5rem" }}>🔥</div>
-              <div className="pm-streak-num" style={{ fontSize: "2rem", fontWeight: 900, color: "#a78bfa", lineHeight: 1 }}>
-                {streakCount}
-              </div>
-              <div style={{ fontSize: "0.65rem", color: "#4a4a5a", marginTop: "0.3rem", textTransform: "uppercase", letterSpacing: "0.08em" }}>days</div>
-              <div style={{ fontSize: "0.75rem", color: "#6b6b7b", marginTop: "0.2rem", fontWeight: 500 }}>Study Streak</div>
-            </div>
-
-            {/* Hours */}
-            <div className="pm-stat-card" style={{ borderColor: "rgba(59,130,246,0.15)" }}>
-              <div style={{ fontSize: "1.6rem", marginBottom: "0.5rem" }}>⏱️</div>
-              <div style={{ fontSize: "2rem", fontWeight: 900, color: "#60a5fa", lineHeight: 1 }}>
-                {studyHoursToday.toFixed(1)}
-              </div>
-              <div style={{ fontSize: "0.65rem", color: "#4a4a5a", marginTop: "0.3rem", textTransform: "uppercase", letterSpacing: "0.08em" }}>hrs</div>
-              <div style={{ fontSize: "0.75rem", color: "#6b6b7b", marginTop: "0.2rem", fontWeight: 500 }}>Hours Today</div>
-            </div>
-
-            {/* Habits */}
-            <div className="pm-stat-card" style={{ borderColor: "rgba(74,222,128,0.15)" }}>
-              <div style={{ fontSize: "1.6rem", marginBottom: "0.5rem" }}>✅</div>
-              <div style={{ fontSize: "2rem", fontWeight: 900, color: "#4ade80", lineHeight: 1 }}>
-                {completedHabits}
-                <span style={{ fontSize: "1.1rem", color: "#4a4a5a", fontWeight: 500 }}>/{todayHabits.length}</span>
-              </div>
-              <div style={{ fontSize: "0.65rem", color: "#4a4a5a", marginTop: "0.3rem", textTransform: "uppercase", letterSpacing: "0.08em" }}>{habitPercent}% done</div>
-              <div style={{ fontSize: "0.75rem", color: "#6b6b7b", marginTop: "0.2rem", fontWeight: 500 }}>Habits Done</div>
-            </div>
+          {/* ── Key Insight ── */}
+          <div className="stagger-3 db-card" style={{ marginBottom: "24px", borderLeft: "3px solid #6c63ff", background: "rgba(108,99,255,0.04)" }}>
+            <p style={{ color: "#44445a", fontSize: "11px", fontFamily: "'DM Mono', monospace", letterSpacing: "0.06em", marginBottom: "10px" }}>
+              YOUR COACH SAYS
+            </p>
+            <p style={{
+              color: "#c8c8ee", fontSize: "15px", lineHeight: 1.7,
+              fontStyle: "italic", margin: 0, fontFamily: "'DM Sans', sans-serif",
+            }}>
+              &ldquo;{masterPlan.diagnosis.keyInsight}&rdquo;
+            </p>
           </div>
 
-          {/* Schedule + Habits */}
-          <div className="stagger-4" style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "1.5rem", marginBottom: "1.5rem" }}>
+          {/* ── Main 2-col grid ── */}
+          <div className="stagger-4" style={{
+            display: "grid",
+            gridTemplateColumns: isMobile ? "1fr" : "1fr 1fr",
+            gap: "20px", marginBottom: "24px",
+          }}>
+            {/* Habit Tracker */}
+            <div className="db-card">
+              <p style={{ color: "#44445a", fontSize: "11px", fontFamily: "'DM Mono', monospace", letterSpacing: "0.06em", marginBottom: "14px" }}>
+                DAILY HABITS
+              </p>
 
-            {/* Today's schedule */}
-            <div className="pm-glass-card">
-              <h2 style={{
-                fontFamily: "'Playfair Display', serif",
-                fontSize: "1rem", fontWeight: 700, color: "#e4e4f0", margin: "0 0 1.25rem",
-                display: "flex", alignItems: "center", gap: "0.5rem",
-              }}>
-                <span style={{
-                  width: "6px", height: "6px", borderRadius: "50%",
-                  background: "linear-gradient(135deg, #7c3aed, #ec4899)",
-                  display: "inline-block",
-                }} />
-                Today&apos;s Schedule
-              </h2>
+              {/* Progress bar */}
+              <div style={{ marginBottom: "18px" }}>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "8px" }}>
+                  <span style={{ color: "#8888aa", fontSize: "12px" }}>{completedHabits} of {todayHabits.length} done</span>
+                  <span style={{ color: "#00d4aa", fontSize: "12px", fontFamily: "'DM Mono', monospace", fontWeight: 700 }}>{habitPercent}%</span>
+                </div>
+                <div style={{ height: "5px", background: "#1e1e35", borderRadius: "999px", overflow: "hidden" }}>
+                  <div className="progress-animated" style={{
+                    height: "100%",
+                    width: `${habitPercent}%`,
+                    background: "linear-gradient(90deg, #6c63ff, #ff6b9d)",
+                    borderRadius: "999px",
+                  }} />
+                </div>
+              </div>
+
+              <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
+                {todayHabits.map((habit, i) => {
+                  const done = habitCompletions[habit.id];
+                  const icon = HABIT_ICONS[habit.category] ?? "📌";
+                  return (
+                    <div
+                      key={habit.id}
+                      className="db-habit-row"
+                      onClick={() => toggleHabit(habit.id)}
+                      style={{
+                        background: done ? "rgba(0,212,170,0.05)" : "transparent",
+                        borderColor: done ? "rgba(0,212,170,0.2)" : "#1e1e35",
+                        animationDelay: `${i * 0.05}s`,
+                      }}
+                    >
+                      {/* Checkbox */}
+                      <div style={{
+                        width: "18px", height: "18px", borderRadius: "5px", flexShrink: 0,
+                        border: done ? "none" : "2px solid #2a2a45",
+                        background: done ? "#00d4aa" : "transparent",
+                        display: "flex", alignItems: "center", justifyContent: "center",
+                        animation: done ? "check-pop 0.25s cubic-bezier(0.34,1.56,0.64,1) both" : "none",
+                        transition: "all 0.2s",
+                      }}>
+                        {done && <span style={{ color: "#080810", fontSize: "11px", fontWeight: 900 }}>✓</span>}
+                      </div>
+                      <span style={{ fontSize: "15px", flexShrink: 0 }}>{icon}</span>
+                      <span style={{
+                        flex: 1, fontSize: "13px", lineHeight: 1.4,
+                        color: done ? "#44445a" : "#c8c8ee",
+                        textDecoration: done ? "line-through" : "none",
+                        transition: "all 0.2s",
+                      }}>{habit.habit}</span>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+
+            {/* Today's Schedule */}
+            <div className="db-card">
+              <p style={{ color: "#44445a", fontSize: "11px", fontFamily: "'DM Mono', monospace", letterSpacing: "0.06em", marginBottom: "14px" }}>
+                TODAY&apos;S SCHEDULE
+              </p>
+
               {isRestDay ? (
-                <div style={{ textAlign: "center", padding: "2.5rem 0" }}>
-                  <div style={{ fontSize: "2.5rem", marginBottom: "0.75rem" }}>🛌</div>
-                  <p style={{ color: "#4a4a5a", fontSize: "0.85rem", margin: 0 }}>Rest day — no study blocks</p>
+                <div style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", padding: "32px 0", gap: "12px" }}>
+                  <span style={{ fontSize: "36px", animation: "float 4s ease-in-out infinite" }}>🌿</span>
+                  <h3 style={{ fontFamily: "'Syne', sans-serif", fontWeight: 700, fontSize: "18px", color: "#f0f0ff", margin: 0 }}>Rest & Recharge</h3>
+                  <p style={{ color: "#8888aa", fontSize: "13px", textAlign: "center", margin: 0, lineHeight: 1.6 }}>No study blocks today. Recover, reflect, and come back stronger tomorrow.</p>
                 </div>
               ) : todaySchedule.length === 0 ? (
-                <p style={{ color: "#4a4a5a", fontSize: "0.85rem", margin: 0 }}>No blocks scheduled</p>
+                <p style={{ color: "#44445a", fontSize: "14px", textAlign: "center", padding: "32px 0" }}>No blocks scheduled today.</p>
               ) : (
-                <div style={{ display: "flex", flexDirection: "column", gap: "0.5rem" }}>
+                <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
                   {todaySchedule.map((block, i) => {
-                    const colors = subjectColors[block.subject] ?? subjectColors.default;
+                    const color = SUBJECT_COLORS[block.subject] ?? SUBJECT_COLORS.default;
                     return (
-                      <div key={block.id} className="pm-schedule-block" style={{ animationDelay: `${0.05 * i}s` }}>
-                        <div style={{
-                          width: "3px", height: "2.4rem", borderRadius: "999px",
-                          background: colors.accent, flexShrink: 0,
-                          boxShadow: `0 0 8px ${colors.accent}60`,
-                        }} />
-                        <div style={{
-                          width: "32px", height: "32px", borderRadius: "8px",
-                          background: colors.bg, flexShrink: 0,
-                          display: "flex", alignItems: "center", justifyContent: "center",
-                          fontSize: "0.7rem", fontWeight: 700, color: colors.accent,
-                        }}>
-                          {block.subject.slice(0, 2).toUpperCase()}
+                      <div key={block.id} className="db-sched-block" style={{ animationDelay: `${i * 0.06}s` }}>
+                        {/* Time */}
+                        <div style={{ minWidth: "48px", flexShrink: 0 }}>
+                          <div style={{ color: "#6c63ff", fontSize: "12px", fontFamily: "'DM Mono', monospace", fontWeight: 500 }}>{block.time}</div>
+                          <div style={{ color: "#44445a", fontSize: "10px", fontFamily: "'DM Mono', monospace", marginTop: "2px" }}>{block.durationMinutes}m</div>
                         </div>
+                        {/* Accent bar */}
+                        <div style={{ width: "3px", minHeight: "36px", background: color, borderRadius: "999px", flexShrink: 0 }} />
+                        {/* Content */}
                         <div style={{ flex: 1, minWidth: 0 }}>
-                          <div style={{ fontSize: "0.82rem", fontWeight: 600, color: "#e0e0e8", marginBottom: "0.1rem" }}>{block.subject}</div>
-                          <div style={{ fontSize: "0.7rem", color: "#4a4a5a" }}>{block.time} · {block.durationMinutes}min · {block.method}</div>
+                          <div style={{ fontFamily: "'Syne', sans-serif", fontWeight: 600, fontSize: "13px", color: "#f0f0ff", marginBottom: "2px" }}>{block.subject}</div>
+                          <div style={{ fontSize: "11px", color: "#8888aa" }}>{block.method}</div>
                         </div>
                       </div>
                     );
@@ -784,168 +581,67 @@ export default function DashboardPage() {
                 </div>
               )}
             </div>
-
-            {/* Habit checklist */}
-            <div className="pm-glass-card">
-              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "1rem" }}>
-                <h2 style={{
-                  fontFamily: "'Playfair Display', serif",
-                  fontSize: "1rem", fontWeight: 700, color: "#e4e4f0", margin: 0,
-                  display: "flex", alignItems: "center", gap: "0.5rem",
-                }}>
-                  <span style={{
-                    width: "6px", height: "6px", borderRadius: "50%",
-                    background: "linear-gradient(135deg, #4ade80, #22d3ee)",
-                    display: "inline-block",
-                  }} />
-                  Daily Habits
-                </h2>
-                <span style={{
-                  color: "#a78bfa", fontSize: "0.78rem", fontWeight: 700,
-                  background: "rgba(167,139,250,0.1)", padding: "0.2rem 0.6rem",
-                  borderRadius: "999px", border: "1px solid rgba(167,139,250,0.2)",
-                }}>
-                  {completedHabits}/{todayHabits.length}
-                </span>
-              </div>
-
-              {/* Progress bar */}
-              <div style={{ height: "4px", background: "rgba(255,255,255,0.06)", borderRadius: "999px", marginBottom: "1rem", overflow: "hidden" }}>
-                <div className="pm-progress-bar" style={{
-                  height: "100%",
-                  width: `${habitPercent}%`,
-                  background: "linear-gradient(90deg, #7c3aed, #4ade80)",
-                  borderRadius: "999px",
-                  boxShadow: "0 0 8px rgba(124,58,237,0.5)",
-                  transition: "width 0.6s cubic-bezier(0.4,0,0.2,1)",
-                }} />
-              </div>
-
-              <div style={{ display: "flex", flexDirection: "column", gap: "0.45rem" }}>
-                {todayHabits.map((habit) => {
-                  const done = !!habitCompletions[habit.id];
-                  return (
-                    <div
-                      key={habit.id}
-                      className="pm-habit-row"
-                      onClick={() => toggleHabit(habit.id)}
-                      style={{
-                        background: done ? "rgba(74,222,128,0.07)" : "rgba(255,255,255,0.02)",
-                        borderColor: done ? "rgba(74,222,128,0.2)" : "rgba(255,255,255,0.06)",
-                      }}
-                    >
-                      <div style={{
-                        width: "20px", height: "20px", borderRadius: "50%",
-                        border: `2px solid ${done ? "#4ade80" : "rgba(255,255,255,0.15)"}`,
-                        background: done ? "linear-gradient(135deg, #4ade80, #22d3ee)" : "transparent",
-                        display: "flex", alignItems: "center", justifyContent: "center",
-                        flexShrink: 0,
-                        transition: "all 0.25s cubic-bezier(0.4,0,0.2,1)",
-                        boxShadow: done ? "0 0 10px rgba(74,222,128,0.4)" : "none",
-                      }}>
-                        {done && (
-                          <span className="check-icon" style={{ color: "#000", fontSize: "0.6rem", fontWeight: 900, lineHeight: 1 }}>✓</span>
-                        )}
-                      </div>
-                      <span style={{
-                        fontSize: "0.8rem",
-                        fontWeight: 500,
-                        color: done ? "#4ade80" : "#a0a0b0",
-                        textDecoration: done ? "line-through" : "none",
-                        opacity: done ? 0.75 : 1,
-                        transition: "all 0.25s",
-                        flex: 1,
-                      }}>{habit.habit}</span>
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
           </div>
 
-          {/* Nav cards */}
-          <div className="stagger-5" style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: "1rem", marginBottom: "1.5rem" }}>
-            {[
-              { label: "Full Plan", desc: "Diagnosis & strategy", icon: "📋", path: "/plan", color: "#8b5cf6" },
-              { label: "Schedule", desc: "Weekly timetable", icon: "📅", path: "/schedule", color: "#3b82f6" },
-              { label: "AI Coach", desc: "Chat with your coach", icon: "💬", path: "/coach", color: "#ec4899" },
-              { label: "Progress", desc: "Track your growth", icon: "📈", path: "/progress", color: "#10b981" },
-            ].map((item) => (
-              <div
-                key={item.path}
-                className="pm-nav-card"
-                onClick={() => router.push(item.path)}
+          {/* ── Quick nav cards ── */}
+          <div className="stagger-5" style={{
+            display: "grid",
+            gridTemplateColumns: isMobile ? "repeat(2,1fr)" : "repeat(4,1fr)",
+            gap: "12px", marginBottom: "28px",
+          }}>
+            {QUICK_NAV.map(({ label, emoji, path, color, desc }) => (
+              <button
+                key={path}
+                type="button"
+                onClick={() => router.push(path)}
+                className="db-quick-card"
+                style={{
+                  borderColor: "#1e1e35",
+                }}
+                onMouseEnter={(e) => {
+                  const el = e.currentTarget;
+                  el.style.borderColor = `${color}44`;
+                  el.style.boxShadow = `0 8px 28px ${color}14`;
+                  el.style.background = `${color}08`;
+                }}
+                onMouseLeave={(e) => {
+                  const el = e.currentTarget;
+                  el.style.borderColor = "#1e1e35";
+                  el.style.boxShadow = "none";
+                  el.style.background = "#12121e";
+                }}
               >
-                <div style={{
-                  width: "40px", height: "40px", borderRadius: "12px",
-                  background: `${item.color}18`,
-                  border: `1px solid ${item.color}30`,
-                  display: "flex", alignItems: "center", justifyContent: "center",
-                  fontSize: "1.2rem", marginBottom: "0.75rem",
-                  transition: "all 0.2s",
-                }}>{item.icon}</div>
-                <div style={{ fontWeight: 700, fontSize: "0.875rem", color: "#e4e4f0", marginBottom: "0.25rem" }}>{item.label}</div>
-                <div style={{ fontSize: "0.73rem", color: "#4a4a5a", lineHeight: 1.4 }}>{item.desc}</div>
-                <div style={{
-                  marginTop: "0.85rem",
-                  fontSize: "0.7rem",
-                  color: item.color,
-                  display: "flex",
-                  alignItems: "center",
-                  gap: "0.25rem",
-                  opacity: 0.8,
-                  fontWeight: 500,
-                }}>
-                  Open →
-                </div>
-              </div>
+                <div style={{ fontSize: "22px", marginBottom: "10px" }}>{emoji}</div>
+                <div style={{ fontFamily: "'Syne', sans-serif", fontWeight: 700, fontSize: "14px", color: "#f0f0ff", marginBottom: "3px" }}>{label}</div>
+                <div style={{ color: "#44445a", fontSize: "12px" }}>{desc}</div>
+              </button>
             ))}
           </div>
 
-          {/* Study method */}
-          <div className="pm-glass-card stagger-6" style={{
-            background: "rgba(124,58,237,0.06)",
-            borderColor: "rgba(124,58,237,0.2)",
-            boxShadow: "0 0 30px rgba(124,58,237,0.08)",
-          }}>
-            <div style={{ display: "flex", alignItems: "flex-start", gap: "1rem" }}>
+          {/* ── Problems section ── */}
+          {masterPlan.diagnosis.primaryProblems.length > 0 && (
+            <div className="stagger-6" style={{ marginBottom: "40px" }}>
+              <p style={{ color: "#44445a", fontSize: "11px", fontFamily: "'DM Mono', monospace", letterSpacing: "0.06em", marginBottom: "14px" }}>
+                WHAT WE&apos;RE FIXING
+              </p>
               <div style={{
-                width: "44px", height: "44px", borderRadius: "12px",
-                background: "rgba(124,58,237,0.2)",
-                border: "1px solid rgba(124,58,237,0.3)",
-                display: "flex", alignItems: "center", justifyContent: "center",
-                fontSize: "1.2rem", flexShrink: 0,
-                boxShadow: "0 0 16px rgba(124,58,237,0.25)",
-              }}>📚</div>
-              <div style={{ flex: 1 }}>
-                <p style={{ color: "#4a4a5a", fontSize: "0.67rem", margin: "0 0 0.35rem", textTransform: "uppercase", letterSpacing: "0.1em", fontWeight: 600 }}>
-                  Your Primary Study Method
-                </p>
-                <p style={{ color: "#e4e4f0", fontSize: "0.92rem", fontWeight: 700, margin: "0 0 0.35rem" }}>
-                  {masterPlan.strategy.primaryStudyMethod}
-                </p>
-                <p style={{ color: "#5a5a6a", fontSize: "0.8rem", margin: 0, lineHeight: 1.6 }}>
-                  {masterPlan.strategy.primaryMethodDescription}
-                </p>
+                display: "grid",
+                gridTemplateColumns: isMobile ? "1fr" : "repeat(3,1fr)",
+                gap: "10px",
+              }}>
+                {masterPlan.diagnosis.primaryProblems.map((problem, i) => (
+                  <div key={i} className="db-problem-card" style={{ animationDelay: `${i * 0.07}s` }}>
+                    <div style={{ fontSize: "16px", marginBottom: "8px" }}>
+                      {["⚠️", "📵", "🔄"][i] ?? "⚠️"}
+                    </div>
+                    <p style={{ color: "#c8c8ee", fontSize: "13px", margin: 0, lineHeight: 1.6 }}>{problem}</p>
+                  </div>
+                ))}
               </div>
             </div>
-          </div>
+          )}
 
         </div>
-
-        {/* DEV: reload test data */}
-        <button type="button" onClick={loadTestData} style={{
-          position: "fixed", bottom: "1rem", right: "1rem",
-          padding: "0.3rem 0.65rem", fontSize: "0.68rem", color: "#444",
-          background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.08)", borderRadius: "6px",
-          cursor: "pointer", fontFamily: "monospace", opacity: 0.5,
-          zIndex: 9999, transition: "opacity 0.15s",
-        }}
-          onMouseEnter={(e) => { e.currentTarget.style.opacity = "1"; e.currentTarget.style.color = "#aaa"; }}
-          onMouseLeave={(e) => { e.currentTarget.style.opacity = "0.5"; e.currentTarget.style.color = "#444"; }}
-        >
-          [dev] load test data
-        </button>
       </div>
     </>
   );

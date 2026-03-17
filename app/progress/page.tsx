@@ -5,51 +5,43 @@ import { useRouter } from "next/navigation";
 import { useAppStore } from "@/lib/store";
 import type { StudySession } from "@/lib/types";
 
-function getTodayString() {
-  return new Date().toISOString().split("T")[0];
-}
+function getTodayString() { return new Date().toISOString().split("T")[0]; }
 
-function getLast7Days(): string[] {
-  return Array.from({ length: 7 }, (_, i) => {
+function getLast84Days(): string[] {
+  return Array.from({ length: 84 }, (_, i) => {
     const d = new Date();
-    d.setDate(d.getDate() - (6 - i));
+    d.setDate(d.getDate() - (83 - i));
     return d.toISOString().split("T")[0];
   });
 }
 
-function getLast30Days(): string[] {
-  return Array.from({ length: 30 }, (_, i) => {
-    const d = new Date();
-    d.setDate(d.getDate() - (29 - i));
-    return d.toISOString().split("T")[0];
-  });
-}
-
-function formatShortDate(iso: string): string {
+function formatShortDate(iso: string) {
   const d = new Date(iso + "T00:00:00");
   return d.toLocaleDateString("en-US", { month: "short", day: "numeric" });
 }
 
+const HABIT_ICONS: Record<string, string> = {
+  lifestyle: "🌅", study: "📚", focus: "🎯", mindset: "🧠", health: "💪",
+};
+
 export default function ProgressPage() {
   const router = useRouter();
-  const store = useAppStore();
-  const masterPlan = store.masterPlan;
-  const studentProfile = store.studentProfile;
-  const isOnboarded = store.isOnboarded;
-  const studySessions = store.studySessions;
+  const store  = useAppStore();
+  const masterPlan      = store.masterPlan;
+  const studentProfile  = store.studentProfile;
+  const isOnboarded     = store.isOnboarded;
+  const studySessions   = store.studySessions;
   const habitCompletions = store.habitCompletions;
-  const currentStreak = store.currentStreak;
-  const studyHoursToday = store.studyHoursToday;
+  const currentStreak   = store.currentStreak;
+  const longestStreak   = store.longestStreak;
   const logStudySession = store.logStudySession;
 
-  const [isMobile, setIsMobile] = useState(false);
-
-  // Form state
-  const [subject, setSubject] = useState("");
-  const [duration, setDuration] = useState(45);
-  const [method, setMethod] = useState("");
-  const [quality, setQuality] = useState<1 | 2 | 3 | 4 | 5>(3);
-  const [notes, setNotes] = useState("");
+  const [isMobile, setIsMobile]     = useState(false);
+  const [subject, setSubject]       = useState("");
+  const [duration, setDuration]     = useState(45);
+  const [method, setMethod]         = useState("");
+  const [quality, setQuality]       = useState<1|2|3|4|5>(3);
+  const [notes, setNotes]           = useState("");
   const [formSuccess, setFormSuccess] = useState(false);
 
   useEffect(() => {
@@ -66,366 +58,369 @@ export default function ProgressPage() {
 
   useEffect(() => {
     if (masterPlan && !subject) {
-      const firstSubject = masterPlan.strategy.subjects[0]?.subject ?? "";
-      setSubject(firstSubject);
+      setSubject(masterPlan.strategy.subjects[0]?.subject ?? "");
       setMethod(masterPlan.strategy.primaryStudyMethod);
     }
   }, [masterPlan, subject]);
 
   if (!masterPlan || !studentProfile) {
     return (
-      <div style={{ minHeight: "100vh", background: "#0a0a0a", display: "flex", alignItems: "center", justifyContent: "center" }}>
-        <div style={{ textAlign: "center" }}>
-          <div style={{ width: "40px", height: "40px", border: "3px solid #1e1e1e", borderTop: "3px solid #7c3aed", borderRadius: "50%", animation: "spin 1s linear infinite", margin: "0 auto 1rem" }} />
-          <style>{`@keyframes spin{to{transform:rotate(360deg)}}`}</style>
-          <p style={{ color: "#555", fontSize: "0.875rem" }}>Loading progress…</p>
-        </div>
+      <div style={{ minHeight: "100vh", background: "#080810", display: "flex", alignItems: "center", justifyContent: "center" }}>
+        <div style={{ width: "36px", height: "36px", border: "3px solid #1e1e35", borderTop: "3px solid #6c63ff", borderRadius: "50%", animation: "spin 0.8s linear infinite" }} />
       </div>
     );
   }
 
-  const today = getTodayString();
-  const last7 = getLast7Days();
-  const last30 = getLast30Days();
-
-  const todaySessions = studySessions.filter((s) => s.date === today);
-  const totalSessionsAll = studySessions.length;
+  const today      = getTodayString();
+  const last84     = getLast84Days();
   const totalHoursAll = (studySessions.reduce((a, s) => a + s.durationMinutes, 0) / 60).toFixed(1);
 
-  // Hours per day for bar chart
-  const hoursPerDay = last7.map((date) => {
-    const mins = studySessions.filter((s) => s.date === date).reduce((a, s) => a + s.durationMinutes, 0);
-    return { date, hours: mins / 60 };
-  });
-  const maxDayHours = Math.max(...hoursPerDay.map((d) => d.hours), 1);
-
-  // Habit completion history (from masterPlan habitSystem completionHistory)
+  // Habit activity set
   const habitDaysSet = new Set<string>();
-  (masterPlan.habitSystem ?? []).forEach((habit) => {
-    (habit.completionHistory ?? []).forEach((d) => habitDaysSet.add(d));
+  (masterPlan.habitSystem ?? []).forEach((h) => {
+    (h.completionHistory ?? []).forEach((d) => habitDaysSet.add(d));
   });
 
+  // Hours per day for last 7
   const subjectOptions = (masterPlan.strategy.subjects ?? []).map((s) => s.subject);
+  const todaySessions  = studySessions.filter((s) => s.date === today);
+  const dailyHabits    = masterPlan.habitSystem.filter((h) => h.frequency === "daily");
+  const doneToday      = dailyHabits.filter((h) => habitCompletions[h.id]).length;
 
   const handleSubmit = () => {
     if (!subject || !method) return;
-    const session: Omit<StudySession, "id" | "date"> = {
-      subject, durationMinutes: duration, method, quality, notes: notes.trim() || undefined,
-    };
+    const session: Omit<StudySession, "id" | "date"> = { subject, durationMinutes: duration, method, quality, notes: notes.trim() || undefined };
     logStudySession(session);
-    setNotes("");
-    setQuality(3);
-    setFormSuccess(true);
+    setNotes(""); setQuality(3); setFormSuccess(true);
     setTimeout(() => setFormSuccess(false), 2500);
   };
 
-  const card: React.CSSProperties = {
-    background: "#111111", border: "1px solid #1e1e1e", borderRadius: "16px",
-    padding: isMobile ? "1.25rem" : "1.5rem", marginBottom: "1.5rem",
-  };
-  const lbl: React.CSSProperties = {
-    color: "#555", fontSize: "0.72rem", textTransform: "uppercase", letterSpacing: "0.08em", margin: "0 0 0.5rem", display: "block",
-  };
   const inp: React.CSSProperties = {
-    width: "100%", background: "#1a1a1a", border: "1px solid #2a2a2a", borderRadius: "10px",
-    padding: "0.7rem 1rem", color: "#fff", fontSize: "0.875rem", outline: "none",
-    boxSizing: "border-box", fontFamily: "inherit",
+    width: "100%", background: "#0f0f1a", border: "1px solid #1e1e35", borderRadius: "10px",
+    padding: "10px 14px", color: "#f0f0ff", fontSize: "14px", outline: "none",
+    boxSizing: "border-box", fontFamily: "'DM Sans', sans-serif", transition: "border-color 0.2s",
   };
-
-  const qualityLabel = ["", "Poor", "Below avg", "Average", "Good", "Excellent"];
-  const qualityColor = ["", "#f87171", "#fb923c", "#facc15", "#4ade80", "#a78bfa"];
+  const qualityColors = ["", "#f87171", "#fb923c", "#facc15", "#00d4aa", "#a594ff"];
+  const qualityLabels = ["", "Poor", "Below avg", "Average", "Good", "Excellent"];
 
   return (
-    <div style={{ minHeight: "100vh", background: "#0a0a0a", fontFamily: "'Inter', sans-serif", paddingBottom: "4rem" }}>
+    <>
+      <style>{`
+        .prog-card {
+          background: #12121e;
+          border: 1px solid #1e1e35;
+          border-radius: 20px;
+          padding: 24px;
+          transition: all 0.25s ease;
+        }
+        .prog-card:hover {
+          border-color: rgba(108,99,255,0.2);
+          box-shadow: 0 6px 24px rgba(108,99,255,0.06);
+        }
+        .prog-stat-card {
+          background: #12121e;
+          border: 1px solid #1e1e35;
+          border-radius: 18px;
+          padding: 20px;
+          text-align: center;
+          transition: all 0.25s ease;
+          cursor: default;
+        }
+        .prog-stat-card:hover {
+          transform: translateY(-2px);
+          border-color: rgba(108,99,255,0.25);
+          box-shadow: 0 8px 24px rgba(108,99,255,0.07);
+        }
+        .heatmap-cell {
+          border-radius: 4px;
+          transition: transform 0.15s ease;
+          cursor: default;
+        }
+        .heatmap-cell:hover { transform: scale(1.3); }
+        .prog-inp:focus { border-color: #6c63ff !important; }
+      `}</style>
 
-      {/* Navbar */}
-      <div style={{
-        background: "rgba(10,10,10,0.95)", borderBottom: "1px solid #1a1a1a",
-        padding: "0.9rem 1.5rem", display: "flex", justifyContent: "space-between",
-        alignItems: "center", position: "sticky", top: 0, zIndex: 100, backdropFilter: "blur(12px)",
-      }}>
-        <span style={{
-          fontFamily: "'Playfair Display', serif", fontSize: "1.1rem", fontWeight: 900,
-          background: "linear-gradient(135deg,#a78bfa,#ec4899)",
-          WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent",
-        }}>PeakMind</span>
-        <div style={{ display: "flex", gap: "0.5rem", flexWrap: "wrap" }}>
-          {[
-            { label: "Dashboard", path: "/dashboard" },
-            { label: "Plan", path: "/plan" },
-            { label: "Schedule", path: "/schedule" },
-            { label: "Coach", path: "/coach" },
-          ].map((item) => (
-            <button key={item.path} type="button" onClick={() => router.push(item.path)} style={{
-              padding: "0.4rem 0.85rem", background: "transparent", border: "1px solid #2a2a2a",
-              borderRadius: "8px", color: "#888", fontSize: "0.8rem", cursor: "pointer", transition: "all 0.15s",
-            }}
-              onMouseEnter={(e) => { e.currentTarget.style.borderColor = "#7c3aed"; e.currentTarget.style.color = "#a78bfa"; }}
-              onMouseLeave={(e) => { e.currentTarget.style.borderColor = "#2a2a2a"; e.currentTarget.style.color = "#888"; }}
-            >{item.label}</button>
-          ))}
-        </div>
+      {/* Ambient bg */}
+      <div style={{ position: "fixed", inset: 0, pointerEvents: "none", zIndex: 0 }}>
+        <div style={{ position: "absolute", top: "10%", left: "10%", width: "360px", height: "360px", borderRadius: "50%", background: "radial-gradient(circle, rgba(108,99,255,0.06) 0%, transparent 70%)", animation: "float 15s ease-in-out infinite" }} />
+        <div style={{ position: "absolute", bottom: "15%", right: "8%", width: "280px", height: "280px", borderRadius: "50%", background: "radial-gradient(circle, rgba(0,212,170,0.05) 0%, transparent 70%)", animation: "float 19s ease-in-out infinite reverse" }} />
       </div>
 
-      <div style={{ maxWidth: "900px", margin: "0 auto", padding: isMobile ? "2rem 1rem 0" : "2.5rem 1.5rem 0" }}>
+      <div style={{ minHeight: "100vh", background: "#080810", paddingBottom: "5rem", position: "relative", zIndex: 1 }}>
+        <div style={{ maxWidth: "900px", margin: "0 auto", padding: isMobile ? "32px 16px 0" : "40px 32px 0" }}>
 
-        {/* Header */}
-        <div style={{ marginBottom: "2rem" }}>
-          <h1 style={{ fontFamily: "'Playfair Display', serif", fontSize: isMobile ? "1.8rem" : "2.2rem", fontWeight: 900, color: "#fff", margin: "0 0 0.3rem" }}>
-            Progress Tracker
-          </h1>
-          <p style={{ color: "#555", fontSize: "0.85rem", margin: 0 }}>{studentProfile.name} · Track every session, build every habit</p>
-        </div>
-
-        {/* Stats */}
-        <div style={{ display: "grid", gridTemplateColumns: isMobile ? "repeat(2,1fr)" : "repeat(4,1fr)", gap: "1rem", marginBottom: "1.5rem" }}>
-          {[
-            { label: "Study Streak", value: `${currentStreak}`, unit: "days", icon: "🔥", color: "#a78bfa" },
-            { label: "Hours Today", value: studyHoursToday.toFixed(1), unit: "hrs", icon: "⏱️", color: "#60a5fa" },
-            { label: "Total Sessions", value: `${totalSessionsAll}`, unit: "logged", icon: "📚", color: "#4ade80" },
-            { label: "Total Hours", value: totalHoursAll, unit: "hrs ever", icon: "🏆", color: "#fb923c" },
-          ].map((stat) => (
-            <div key={stat.label} style={{ background: "#111111", border: "1px solid #1e1e1e", borderRadius: "14px", padding: "1.1rem", textAlign: "center" }}>
-              <div style={{ fontSize: "1.3rem", marginBottom: "0.3rem" }}>{stat.icon}</div>
-              <div style={{ fontSize: "1.5rem", fontWeight: 800, color: stat.color, lineHeight: 1 }}>{stat.value}</div>
-              <div style={{ color: "#555", fontSize: "0.68rem", marginTop: "0.15rem" }}>{stat.unit}</div>
-              <div style={{ color: "#444", fontSize: "0.72rem", marginTop: "0.1rem" }}>{stat.label}</div>
-            </div>
-          ))}
-        </div>
-
-        {/* Log Study Session */}
-        <div style={card}>
-          <h2 style={{ fontFamily: "'Playfair Display', serif", fontSize: "1.1rem", fontWeight: 700, color: "#fff", margin: "0 0 1.25rem" }}>
-            Log Study Session
-          </h2>
-
-          <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "1fr 1fr", gap: "1rem", marginBottom: "1rem" }}>
-            <div>
-              <label style={lbl}>Subject</label>
-              <select
-                value={subject}
-                onChange={(e) => setSubject(e.target.value)}
-                style={{ ...inp, cursor: "pointer" }}
-                onFocus={(e) => { e.currentTarget.style.borderColor = "#7c3aed"; }}
-                onBlur={(e) => { e.currentTarget.style.borderColor = "#2a2a2a"; }}
-              >
-                {subjectOptions.map((s) => (
-                  <option key={s} value={s} style={{ background: "#1a1a1a" }}>{s}</option>
-                ))}
-              </select>
-            </div>
-            <div>
-              <label style={lbl}>Study Method</label>
-              <input
-                value={method}
-                onChange={(e) => setMethod(e.target.value)}
-                placeholder="e.g. Pomodoro, Active Recall"
-                style={inp}
-                onFocus={(e) => { e.currentTarget.style.borderColor = "#7c3aed"; }}
-                onBlur={(e) => { e.currentTarget.style.borderColor = "#2a2a2a"; }}
-              />
-            </div>
+          {/* ── Header ── */}
+          <div className="stagger-1" style={{ marginBottom: "32px" }}>
+            <p style={{ color: "#44445a", fontSize: "11px", fontFamily: "'DM Mono', monospace", letterSpacing: "0.08em", marginBottom: "8px" }}>PROGRESS TRACKER</p>
+            <h1 style={{ fontFamily: "'Syne', sans-serif", fontWeight: 800, fontSize: isMobile ? "1.8rem" : "2.2rem", color: "#f0f0ff", letterSpacing: "-0.03em", margin: "0 0 8px" }}>
+              Your Growth
+            </h1>
+            <p style={{ color: "#8888aa", fontSize: "14px", margin: 0 }}>Every session logged. Every habit tracked.</p>
           </div>
 
-          <div style={{ marginBottom: "1rem" }}>
-            <label style={lbl}>Duration: {duration} minutes ({(duration / 60).toFixed(1)}h)</label>
-            <input
-              type="range" min={15} max={180} step={5} value={duration}
-              onChange={(e) => setDuration(Number(e.target.value))}
-              style={{ width: "100%", accentColor: "#7c3aed", cursor: "pointer" }}
-            />
-            <div style={{ display: "flex", justifyContent: "space-between", marginTop: "0.25rem" }}>
-              <span style={{ color: "#444", fontSize: "0.7rem" }}>15 min</span>
-              <span style={{ color: "#444", fontSize: "0.7rem" }}>180 min</span>
-            </div>
+          {/* ── Stats tiles ── */}
+          <div className="stagger-2" style={{ display: "grid", gridTemplateColumns: isMobile ? "repeat(2,1fr)" : "repeat(4,1fr)", gap: "12px", marginBottom: "24px" }}>
+            {[
+              { label: "Current Streak",  value: currentStreak,             unit: "days",  emoji: "🔥", color: "#ffb347", bg: "rgba(255,179,71,0.08)",   border: "rgba(255,179,71,0.2)"   },
+              { label: "Longest Streak",  value: longestStreak,             unit: "days",  emoji: "🏆", color: "#a594ff", bg: "rgba(108,99,255,0.08)",   border: "rgba(108,99,255,0.2)"   },
+              { label: "Total Hours",     value: totalHoursAll,             unit: "hrs",   emoji: "⏱",  color: "#00d4aa", bg: "rgba(0,212,170,0.07)",    border: "rgba(0,212,170,0.2)"    },
+              { label: "Today's Habits",  value: `${doneToday}/${dailyHabits.length}`, unit: "done", emoji: "✅", color: "#ff6b9d", bg: "rgba(255,107,157,0.07)", border: "rgba(255,107,157,0.2)" },
+            ].map((s, i) => (
+              <div key={s.label} className="prog-stat-card" style={{ background: s.bg, borderColor: s.border, animationDelay: `${i * 0.06}s` }}>
+                <div style={{ fontSize: "20px", marginBottom: "10px" }}>{s.emoji}</div>
+                <div style={{ fontFamily: "'DM Mono', monospace", fontWeight: 700, fontSize: "1.9rem", color: s.color, lineHeight: 1, marginBottom: "4px" }}>{s.value}</div>
+                <div style={{ color: "#44445a", fontSize: "11px", fontFamily: "'DM Mono', monospace" }}>{s.unit}</div>
+                <div style={{ color: "#8888aa", fontSize: "12px", marginTop: "4px" }}>{s.label}</div>
+              </div>
+            ))}
           </div>
 
-          <div style={{ marginBottom: "1rem" }}>
-            <label style={lbl}>Session Quality</label>
-            <div style={{ display: "flex", gap: "0.5rem", flexWrap: "wrap" }}>
-              {([1, 2, 3, 4, 5] as const).map((q) => (
-                <button
-                  key={q}
-                  type="button"
-                  onClick={() => setQuality(q)}
-                  style={{
-                    padding: "0.5rem 1rem", borderRadius: "8px", cursor: "pointer", transition: "all 0.15s",
-                    border: `1px solid ${quality === q ? qualityColor[q] : "#2a2a2a"}`,
-                    background: quality === q ? `${qualityColor[q]}15` : "#141414",
-                    color: quality === q ? qualityColor[q] : "#666",
-                    fontSize: "0.82rem", fontWeight: quality === q ? 700 : 400,
-                  }}
-                >
-                  {"★".repeat(q)} {qualityLabel[q]}
-                </button>
-              ))}
+          {/* ── Activity Heatmap ── */}
+          <div className="stagger-3 prog-card" style={{ marginBottom: "20px" }}>
+            <p style={{ color: "#44445a", fontSize: "11px", fontFamily: "'DM Mono', monospace", letterSpacing: "0.06em", marginBottom: "16px" }}>
+              12-WEEK ACTIVITY
+            </p>
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(12, 1fr)", gap: "4px" }}>
+              {/* 84 days = 12 weeks × 7 days, grouped by week columns */}
+              {Array.from({ length: 12 }, (_, week) =>
+                Array.from({ length: 7 }, (_, day) => {
+                  const idx  = week * 7 + day;
+                  const date = last84[idx];
+                  if (!date) return null;
+                  const hasActivity = habitDaysSet.has(date) || studySessions.some((s) => s.date === date);
+                  const isToday     = date === today;
+                  return (
+                    <div
+                      key={date}
+                      title={`${formatShortDate(date)}${hasActivity ? " — active" : ""}`}
+                      className="heatmap-cell"
+                      style={{
+                        aspectRatio: "1",
+                        background: isToday ? "#6c63ff"
+                          : hasActivity ? "rgba(108,99,255,0.55)"
+                          : "#1a1a2e",
+                        border: isToday ? "1px solid rgba(108,99,255,0.8)" : "1px solid transparent",
+                        boxShadow: isToday ? "0 0 8px rgba(108,99,255,0.5)" : "none",
+                      }}
+                    />
+                  );
+                })
+              )}
             </div>
-          </div>
-
-          <div style={{ marginBottom: "1.25rem" }}>
-            <label style={lbl}>Notes (optional)</label>
-            <textarea
-              value={notes}
-              onChange={(e) => setNotes(e.target.value)}
-              rows={2}
-              placeholder="What did you cover? Any blockers?"
-              style={{ ...inp, resize: "vertical" }}
-              onFocus={(e) => { e.currentTarget.style.borderColor = "#7c3aed"; }}
-              onBlur={(e) => { e.currentTarget.style.borderColor = "#2a2a2a"; }}
-            />
-          </div>
-
-          <button
-            type="button"
-            onClick={handleSubmit}
-            style={{
-              padding: "0.75rem 2rem", background: formSuccess ? "#4ade80" : "#7c3aed",
-              color: formSuccess ? "#000" : "#fff", border: "none", borderRadius: "10px",
-              fontWeight: 700, fontSize: "0.9rem", cursor: "pointer", transition: "all 0.2s",
-            }}
-          >
-            {formSuccess ? "✓ Session Logged!" : "Log Session"}
-          </button>
-        </div>
-
-        {/* Today's Sessions */}
-        <div style={card}>
-          <h2 style={{ fontFamily: "'Playfair Display', serif", fontSize: "1.1rem", fontWeight: 700, color: "#fff", margin: "0 0 1.25rem" }}>
-            Today&apos;s Sessions
-          </h2>
-
-          {todaySessions.length === 0 ? (
-            <div style={{ textAlign: "center", padding: "2rem" }}>
-              <div style={{ fontSize: "1.8rem", marginBottom: "0.5rem" }}>📖</div>
-              <p style={{ color: "#555", fontSize: "0.85rem", margin: 0 }}>No sessions logged today yet. Start your first one above!</p>
-            </div>
-          ) : (
-            <div style={{ display: "flex", flexDirection: "column", gap: "0.6rem" }}>
-              {todaySessions.map((session) => (
-                <div key={session.id} style={{
-                  display: "flex", alignItems: "center", gap: "1rem", flexWrap: isMobile ? "wrap" : "nowrap",
-                  padding: "0.85rem 1rem", background: "#141414", border: "1px solid #1e1e1e",
-                  borderRadius: "10px",
-                }}>
-                  <div style={{ flex: 1, minWidth: "120px" }}>
-                    <div style={{ fontWeight: 600, fontSize: "0.875rem", color: "#e0e0e0", marginBottom: "0.15rem" }}>{session.subject}</div>
-                    <div style={{ fontSize: "0.75rem", color: "#666" }}>{session.method}</div>
-                    {session.notes && <div style={{ fontSize: "0.72rem", color: "#555", marginTop: "0.15rem", fontStyle: "italic" }}>{session.notes}</div>}
-                  </div>
-                  <div style={{ display: "flex", gap: "0.75rem", alignItems: "center", flexShrink: 0 }}>
-                    <span style={{ color: "#a78bfa", fontWeight: 700, fontSize: "0.85rem" }}>{session.durationMinutes}m</span>
-                    <span style={{ color: qualityColor[session.quality], fontSize: "0.78rem" }}>{"★".repeat(session.quality)}</span>
-                  </div>
+            {/* Legend */}
+            <div style={{ display: "flex", gap: "16px", marginTop: "12px", alignItems: "center" }}>
+              {[
+                { color: "#1a1a2e", label: "No activity" },
+                { color: "rgba(108,99,255,0.55)", label: "Active" },
+                { color: "#6c63ff", label: "Today" },
+              ].map(({ color, label }) => (
+                <div key={label} style={{ display: "flex", alignItems: "center", gap: "6px" }}>
+                  <div style={{ width: "11px", height: "11px", borderRadius: "3px", background: color }} />
+                  <span style={{ color: "#44445a", fontSize: "11px", fontFamily: "'DM Mono', monospace" }}>{label}</span>
                 </div>
               ))}
-              <div style={{ paddingTop: "0.5rem", borderTop: "1px solid #1e1e1e", display: "flex", justifyContent: "flex-end" }}>
-                <span style={{ color: "#a78bfa", fontSize: "0.82rem", fontWeight: 600 }}>
-                  Total: {(todaySessions.reduce((a, s) => a + s.durationMinutes, 0) / 60).toFixed(1)}h today
-                </span>
+            </div>
+          </div>
+
+          {/* ── Habit streaks + Progress metrics ── */}
+          <div className="stagger-4" style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "1fr 1fr", gap: "20px", marginBottom: "20px" }}>
+
+            {/* Habit Streaks */}
+            <div className="prog-card">
+              <p style={{ color: "#44445a", fontSize: "11px", fontFamily: "'DM Mono', monospace", letterSpacing: "0.06em", marginBottom: "16px" }}>
+                HABIT STREAKS
+              </p>
+              <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
+                {dailyHabits.map((habit) => {
+                  const done   = habitCompletions[habit.id];
+                  const streak = habit.streak ?? 0;
+                  const icon   = HABIT_ICONS[habit.category] ?? "📌";
+                  return (
+                    <div key={habit.id} style={{ padding: "12px 14px", background: "#0f0f1a", border: "1px solid #1e1e35", borderRadius: "12px" }}>
+                      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "8px" }}>
+                        <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                          <span style={{ fontSize: "14px" }}>{icon}</span>
+                          <span style={{ fontSize: "13px", color: "#c8c8ee", fontWeight: 500, lineHeight: 1.3 }}>{habit.habit}</span>
+                        </div>
+                        {streak > 0 && (
+                          <span style={{ fontFamily: "'DM Mono', monospace", fontSize: "13px", fontWeight: 700, color: "#ffb347", flexShrink: 0, marginLeft: "8px" }}>🔥{streak}</span>
+                        )}
+                      </div>
+                      {/* Thin bar */}
+                      <div style={{ height: "3px", background: "#1e1e35", borderRadius: "999px", overflow: "hidden" }}>
+                        <div style={{
+                          height: "100%", width: done ? "100%" : "0%",
+                          background: "#00d4aa",
+                          borderRadius: "999px", transition: "width 0.6s ease",
+                        }} />
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+
+            {/* Progress Metrics */}
+            <div className="prog-card">
+              <p style={{ color: "#44445a", fontSize: "11px", fontFamily: "'DM Mono', monospace", letterSpacing: "0.06em", marginBottom: "16px" }}>
+                PROGRESS METRICS
+              </p>
+              {(masterPlan.weeklyReview?.progressMetrics ?? []).length === 0 ? (
+                <p style={{ color: "#44445a", fontSize: "14px" }}>No metrics defined yet.</p>
+              ) : (
+                <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
+                  {(masterPlan.weeklyReview?.progressMetrics ?? []).map((m) => {
+                    const pct   = m.target > 0 ? Math.min(100, (m.current / m.target) * 100) : 0;
+                    const color = pct >= 80 ? "#00d4aa" : pct >= 50 ? "#ffb347" : "#ff6b9d";
+                    return (
+                      <div key={m.metric} style={{ padding: "12px 14px", background: "#0f0f1a", border: "1px solid #1e1e35", borderRadius: "12px" }}>
+                        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "8px" }}>
+                          <span style={{ fontSize: "13px", color: "#c8c8ee", fontWeight: 500 }}>{m.metric}</span>
+                          <span style={{ fontFamily: "'DM Mono', monospace", fontSize: "12px", color, fontWeight: 700 }}>
+                            {m.current}/{m.target} {m.unit}
+                          </span>
+                        </div>
+                        <div style={{ height: "6px", background: "#1e1e35", borderRadius: "999px", overflow: "hidden" }}>
+                          <div className="progress-animated" style={{
+                            height: "100%", width: `${pct}%`,
+                            background: color, borderRadius: "999px",
+                          }} />
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* ── Strengths ── */}
+          {(masterPlan.diagnosis.strengths ?? []).length > 0 && (
+            <div className="stagger-5 prog-card" style={{ marginBottom: "20px" }}>
+              <p style={{ color: "#44445a", fontSize: "11px", fontFamily: "'DM Mono', monospace", letterSpacing: "0.06em", marginBottom: "16px" }}>
+                YOUR STRENGTHS
+              </p>
+              <div style={{ display: "flex", flexWrap: "wrap", gap: "8px" }}>
+                {masterPlan.diagnosis.strengths.map((s) => (
+                  <span key={s} style={{
+                    display: "inline-flex", alignItems: "center", gap: "6px",
+                    padding: "6px 14px", borderRadius: "999px",
+                    background: "rgba(0,212,170,0.08)", border: "1px solid rgba(0,212,170,0.2)",
+                    color: "#00d4aa", fontSize: "13px",
+                  }}>
+                    <span style={{ fontSize: "10px" }}>✓</span> {s}
+                  </span>
+                ))}
               </div>
             </div>
           )}
-        </div>
 
-        {/* Weekly Hours Bar Chart */}
-        <div style={card}>
-          <h2 style={{ fontFamily: "'Playfair Display', serif", fontSize: "1.1rem", fontWeight: 700, color: "#fff", margin: "0 0 1.5rem" }}>
-            Last 7 Days
-          </h2>
-          <div style={{ display: "flex", alignItems: "flex-end", gap: "0.5rem", height: "120px" }}>
-            {hoursPerDay.map((day) => {
-              const barH = maxDayHours > 0 ? (day.hours / maxDayHours) * 100 : 0;
-              const isToday = day.date === today;
-              return (
-                <div key={day.date} style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", height: "100%", justifyContent: "flex-end", gap: "0.35rem" }}>
-                  <div style={{ fontSize: "0.65rem", color: "#666", fontWeight: 600 }}>{day.hours > 0 ? `${day.hours.toFixed(1)}h` : ""}</div>
-                  <div style={{
-                    width: "100%", height: `${Math.max(barH, day.hours > 0 ? 4 : 0)}%`,
-                    background: isToday ? "#7c3aed" : "#2a2a2a",
-                    borderRadius: "4px 4px 0 0", transition: "height 0.4s ease",
-                    minHeight: day.hours > 0 ? "4px" : "0",
-                  }} />
-                  <div style={{ color: isToday ? "#a78bfa" : "#444", fontSize: "0.65rem", fontWeight: isToday ? 700 : 400 }}>
-                    {formatShortDate(day.date).split(" ")[0]}
+          {/* ── Log Study Session ── */}
+          <div className="stagger-6 prog-card" style={{ marginBottom: "20px" }}>
+            <p style={{ color: "#44445a", fontSize: "11px", fontFamily: "'DM Mono', monospace", letterSpacing: "0.06em", marginBottom: "16px" }}>
+              LOG STUDY SESSION
+            </p>
+
+            <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "1fr 1fr", gap: "12px", marginBottom: "12px" }}>
+              <div>
+                <label style={{ display: "block", color: "#8888aa", fontSize: "11px", fontFamily: "'DM Mono', monospace", marginBottom: "6px" }}>SUBJECT</label>
+                <select value={subject} onChange={(e) => setSubject(e.target.value)} style={{ ...inp, cursor: "pointer" }}
+                  onFocus={(e) => { e.currentTarget.style.borderColor = "#6c63ff"; }}
+                  onBlur={(e) => { e.currentTarget.style.borderColor = "#1e1e35"; }}>
+                  {subjectOptions.map((s) => <option key={s} value={s} style={{ background: "#12121e" }}>{s}</option>)}
+                </select>
+              </div>
+              <div>
+                <label style={{ display: "block", color: "#8888aa", fontSize: "11px", fontFamily: "'DM Mono', monospace", marginBottom: "6px" }}>METHOD</label>
+                <input value={method} onChange={(e) => setMethod(e.target.value)} placeholder="e.g. Active Recall" style={inp}
+                  onFocus={(e) => { e.currentTarget.style.borderColor = "#6c63ff"; }}
+                  onBlur={(e) => { e.currentTarget.style.borderColor = "#1e1e35"; }} />
+              </div>
+            </div>
+
+            <div style={{ marginBottom: "12px" }}>
+              <label style={{ display: "block", color: "#8888aa", fontSize: "11px", fontFamily: "'DM Mono', monospace", marginBottom: "6px" }}>
+                DURATION — <span style={{ color: "#a594ff", fontWeight: 700 }}>{duration} min</span>
+              </label>
+              <input type="range" min={15} max={180} step={5} value={duration} onChange={(e) => setDuration(Number(e.target.value))}
+                style={{ width: "100%", accentColor: "#6c63ff", cursor: "pointer" }} />
+            </div>
+
+            <div style={{ marginBottom: "12px" }}>
+              <label style={{ display: "block", color: "#8888aa", fontSize: "11px", fontFamily: "'DM Mono', monospace", marginBottom: "8px" }}>QUALITY</label>
+              <div style={{ display: "flex", gap: "6px", flexWrap: "wrap" }}>
+                {([1,2,3,4,5] as const).map((q) => (
+                  <button key={q} type="button" onClick={() => setQuality(q)} style={{
+                    padding: "6px 14px", borderRadius: "8px", cursor: "pointer", transition: "all 0.15s",
+                    border: `1px solid ${quality === q ? qualityColors[q] : "#1e1e35"}`,
+                    background: quality === q ? `${qualityColors[q]}18` : "#0f0f1a",
+                    color: quality === q ? qualityColors[q] : "#44445a",
+                    fontSize: "13px", fontWeight: quality === q ? 700 : 400,
+                    fontFamily: "'DM Sans', sans-serif",
+                  }}>{"★".repeat(q)} {qualityLabels[q]}</button>
+                ))}
+              </div>
+            </div>
+
+            <div style={{ marginBottom: "16px" }}>
+              <label style={{ display: "block", color: "#8888aa", fontSize: "11px", fontFamily: "'DM Mono', monospace", marginBottom: "6px" }}>NOTES (optional)</label>
+              <textarea value={notes} onChange={(e) => setNotes(e.target.value)} rows={2}
+                placeholder="What did you cover?" style={{ ...inp, resize: "vertical" }}
+                onFocus={(e) => { e.currentTarget.style.borderColor = "#6c63ff"; }}
+                onBlur={(e) => { e.currentTarget.style.borderColor = "#1e1e35"; }} />
+            </div>
+
+            <button type="button" onClick={handleSubmit} style={{
+              padding: "11px 28px",
+              background: formSuccess ? "#00d4aa" : "linear-gradient(135deg, #6c63ff, #a594ff)",
+              color: formSuccess ? "#080810" : "#fff",
+              border: "none", borderRadius: "11px",
+              fontWeight: 700, fontSize: "14px", cursor: "pointer", transition: "all 0.2s",
+              fontFamily: "'DM Sans', sans-serif",
+            }}>
+              {formSuccess ? "✓ Session Logged!" : "Log Session"}
+            </button>
+          </div>
+
+          {/* ── Today's sessions ── */}
+          <div className="prog-card" style={{ marginBottom: "20px" }}>
+            <p style={{ color: "#44445a", fontSize: "11px", fontFamily: "'DM Mono', monospace", letterSpacing: "0.06em", marginBottom: "16px" }}>
+              TODAY&apos;S SESSIONS
+            </p>
+            {todaySessions.length === 0 ? (
+              <div style={{ textAlign: "center", padding: "28px 0" }}>
+                <div style={{ fontSize: "28px", marginBottom: "8px" }}>📖</div>
+                <p style={{ color: "#44445a", fontSize: "14px", margin: 0 }}>No sessions logged yet. Start your first one above!</p>
+              </div>
+            ) : (
+              <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
+                {todaySessions.map((session) => (
+                  <div key={session.id} style={{
+                    display: "flex", alignItems: "center", gap: "12px",
+                    padding: "12px 14px", background: "#0f0f1a",
+                    border: "1px solid #1e1e35", borderRadius: "12px",
+                  }}>
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ fontWeight: 600, fontSize: "14px", color: "#f0f0ff", marginBottom: "2px" }}>{session.subject}</div>
+                      <div style={{ fontSize: "12px", color: "#8888aa" }}>{session.method}</div>
+                    </div>
+                    <div style={{ display: "flex", gap: "12px", alignItems: "center", flexShrink: 0 }}>
+                      <span style={{ color: "#a594ff", fontWeight: 700, fontSize: "13px", fontFamily: "'DM Mono', monospace" }}>{session.durationMinutes}m</span>
+                      <span style={{ color: qualityColors[session.quality], fontSize: "12px" }}>{"★".repeat(session.quality)}</span>
+                    </div>
                   </div>
+                ))}
+                <div style={{ paddingTop: "10px", borderTop: "1px solid #1e1e35", textAlign: "right" }}>
+                  <span style={{ color: "#a594ff", fontSize: "13px", fontWeight: 700, fontFamily: "'DM Mono', monospace" }}>
+                    {(todaySessions.reduce((a, s) => a + s.durationMinutes, 0) / 60).toFixed(1)}h today
+                  </span>
                 </div>
-              );
-            })}
+              </div>
+            )}
           </div>
-        </div>
 
-        {/* Habit Calendar — last 30 days */}
-        <div style={card}>
-          <h2 style={{ fontFamily: "'Playfair Display', serif", fontSize: "1.1rem", fontWeight: 700, color: "#fff", margin: "0 0 0.5rem" }}>
-            Habit Activity — Last 30 Days
-          </h2>
-          <p style={{ color: "#555", fontSize: "0.78rem", margin: "0 0 1.25rem" }}>Green = at least one habit completed that day</p>
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(10, 1fr)", gap: "0.3rem" }}>
-            {last30.map((date) => {
-              const hasActivity = habitDaysSet.has(date);
-              const isToday = date === today;
-              return (
-                <div
-                  key={date}
-                  title={`${formatShortDate(date)}${hasActivity ? " — habits done" : ""}`}
-                  style={{
-                    aspectRatio: "1", borderRadius: "4px",
-                    background: hasActivity ? "rgba(74,222,128,0.6)" : "#1a1a1a",
-                    border: isToday ? "1px solid #7c3aed" : "1px solid transparent",
-                    transition: "all 0.15s",
-                  }}
-                />
-              );
-            })}
-          </div>
-          <div style={{ display: "flex", gap: "1rem", marginTop: "0.75rem", alignItems: "center" }}>
-            <div style={{ display: "flex", alignItems: "center", gap: "0.35rem" }}>
-              <div style={{ width: "12px", height: "12px", borderRadius: "3px", background: "#1a1a1a" }} />
-              <span style={{ color: "#555", fontSize: "0.7rem" }}>No activity</span>
-            </div>
-            <div style={{ display: "flex", alignItems: "center", gap: "0.35rem" }}>
-              <div style={{ width: "12px", height: "12px", borderRadius: "3px", background: "rgba(74,222,128,0.6)" }} />
-              <span style={{ color: "#555", fontSize: "0.7rem" }}>Habits done</span>
-            </div>
-          </div>
         </div>
-
-        {/* Progress Metrics */}
-        <div style={card}>
-          <h2 style={{ fontFamily: "'Playfair Display', serif", fontSize: "1.1rem", fontWeight: 700, color: "#fff", margin: "0 0 1.25rem" }}>
-            Progress Metrics
-          </h2>
-          {(masterPlan.weeklyReview?.progressMetrics ?? []).length === 0 ? (
-            <p style={{ color: "#555", fontSize: "0.85rem" }}>No metrics defined in your plan.</p>
-          ) : (
-            <div style={{ display: "flex", flexDirection: "column", gap: "0.75rem" }}>
-              {(masterPlan.weeklyReview?.progressMetrics ?? []).map((m) => {
-                const pct = m.target > 0 ? Math.min(100, (m.current / m.target) * 100) : 0;
-                return (
-                  <div key={m.metric} style={{ padding: "1rem", background: "#141414", border: "1px solid #1e1e1e", borderRadius: "12px" }}>
-                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "0.5rem" }}>
-                      <span style={{ color: "#e0e0e0", fontWeight: 600, fontSize: "0.875rem" }}>{m.metric}</span>
-                      <span style={{ color: "#a78bfa", fontSize: "0.82rem", fontWeight: 700 }}>
-                        {m.current} / {m.target} {m.unit}
-                      </span>
-                    </div>
-                    <div style={{ height: "6px", background: "#1e1e1e", borderRadius: "999px", overflow: "hidden" }}>
-                      <div style={{
-                        height: "100%", width: `${pct}%`,
-                        background: pct >= 80 ? "linear-gradient(90deg,#4ade80,#22c55e)" : pct >= 50 ? "linear-gradient(90deg,#facc15,#fb923c)" : "linear-gradient(90deg,#7c3aed,#a78bfa)",
-                        borderRadius: "999px", transition: "width 0.6s ease",
-                      }} />
-                    </div>
-                    <div style={{ color: "#555", fontSize: "0.7rem", marginTop: "0.3rem" }}>{pct.toFixed(0)}% complete</div>
-                  </div>
-                );
-              })}
-            </div>
-          )}
-        </div>
-
       </div>
-    </div>
+    </>
   );
 }

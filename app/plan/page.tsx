@@ -4,21 +4,29 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useAppStore } from "@/lib/store";
 
-const URGENCY_COLOR: Record<string, string> = {
-  low: "#4ade80", medium: "#facc15", high: "#fb923c", critical: "#f87171",
-};
+type SectionId = "diagnosis" | "strategy" | "habits" | "resources" | "review";
+
+const SECTIONS: { id: SectionId; label: string; emoji: string }[] = [
+  { id: "diagnosis", label: "Diagnosis",     emoji: "🔍" },
+  { id: "strategy",  label: "Strategy",      emoji: "🎯" },
+  { id: "habits",    label: "Habits",        emoji: "⚡" },
+  { id: "resources", label: "Resources",     emoji: "📚" },
+  { id: "review",    label: "Weekly Review", emoji: "📋" },
+];
+
 const PRIORITY_COLOR: Record<string, string> = {
-  high: "#f87171", medium: "#facc15", low: "#4ade80",
+  high: "#ff6b9d", medium: "#ffb347", low: "#00d4aa",
 };
 
 export default function PlanPage() {
   const router = useRouter();
-  const store = useAppStore();
-  const masterPlan = store.masterPlan;
+  const store  = useAppStore();
+  const masterPlan     = store.masterPlan;
   const studentProfile = store.studentProfile;
-  const isOnboarded = store.isOnboarded;
+  const isOnboarded    = store.isOnboarded;
 
-  const [isMobile, setIsMobile] = useState(false);
+  const [activeSection, setActiveSection] = useState<SectionId>("diagnosis");
+  const [isMobile, setIsMobile]           = useState(false);
 
   useEffect(() => {
     const check = () => setIsMobile(window.innerWidth < 640);
@@ -34,354 +42,415 @@ export default function PlanPage() {
 
   if (!masterPlan || !studentProfile) {
     return (
-      <div style={{ minHeight: "100vh", background: "#0a0a0a", display: "flex", alignItems: "center", justifyContent: "center" }}>
-        <div style={{ textAlign: "center" }}>
-          <div style={{ width: "40px", height: "40px", border: "3px solid #1e1e1e", borderTop: "3px solid #7c3aed", borderRadius: "50%", animation: "spin 1s linear infinite", margin: "0 auto 1rem" }} />
-          <style>{`@keyframes spin{to{transform:rotate(360deg)}}`}</style>
-          <p style={{ color: "#555", fontSize: "0.875rem" }}>Loading your plan…</p>
-        </div>
+      <div style={{ minHeight: "100vh", background: "#080810", display: "flex", alignItems: "center", justifyContent: "center" }}>
+        <div style={{ width: "36px", height: "36px", border: "3px solid #1e1e35", borderTop: "3px solid #6c63ff", borderRadius: "50%", animation: "spin 0.8s linear infinite" }} />
       </div>
     );
   }
 
   const { diagnosis, strategy, distractionControl, resources, weeklyReview, meta } = masterPlan;
-  const urgencyColor = URGENCY_COLOR[diagnosis.urgencyLevel] ?? "#a78bfa";
-  const col2 = isMobile ? "1fr" : "1fr 1fr";
-
-  const card: React.CSSProperties = {
-    background: "#111111", border: "1px solid #1e1e1e", borderRadius: "16px",
-    padding: isMobile ? "1.25rem" : "1.75rem", marginBottom: "1.5rem",
-  };
-  const lbl: React.CSSProperties = {
-    color: "#555", fontSize: "0.72rem", textTransform: "uppercase", letterSpacing: "0.08em", margin: "0 0 0.5rem",
-  };
-  const sectionTitle: React.CSSProperties = {
-    fontFamily: "'Playfair Display', serif", fontSize: isMobile ? "1.05rem" : "1.2rem",
-    fontWeight: 700, color: "#fff", margin: "0 0 1.25rem",
-  };
-  const pill = (text: string, color: string) => (
-    <span key={text} style={{
-      display: "inline-block", padding: "0.25rem 0.75rem", borderRadius: "999px",
-      background: `${color}18`, border: `1px solid ${color}33`, color,
-      fontSize: "0.78rem", fontWeight: 500, marginRight: "0.4rem", marginBottom: "0.4rem",
-    }}>{text}</span>
-  );
 
   return (
-    <div style={{ minHeight: "100vh", background: "#0a0a0a", fontFamily: "'Inter', sans-serif", paddingBottom: "4rem" }}>
+    <>
+      <style>{`
+        .plan-sidebar-btn {
+          display: flex;
+          align-items: center;
+          gap: 10px;
+          padding: 10px 14px;
+          border-radius: 10px;
+          border: 1px solid transparent;
+          cursor: pointer;
+          transition: all 0.18s ease;
+          font-family: 'DM Sans', sans-serif;
+          font-size: 13px;
+          font-weight: 500;
+          width: 100%;
+          text-align: left;
+          background: transparent;
+          color: #8888aa;
+        }
+        .plan-sidebar-btn:hover {
+          background: rgba(108,99,255,0.06);
+          color: #c8c8ee;
+          border-color: rgba(108,99,255,0.15);
+        }
+        .plan-sidebar-btn.active {
+          background: rgba(108,99,255,0.12);
+          color: #a594ff;
+          border-color: rgba(108,99,255,0.28);
+        }
+        .plan-card {
+          background: #12121e;
+          border: 1px solid #1e1e35;
+          border-radius: 16px;
+          padding: 20px;
+          transition: all 0.2s ease;
+        }
+        .plan-card:hover {
+          border-color: rgba(108,99,255,0.2);
+        }
+        .plan-tab-btn {
+          display: flex;
+          align-items: center;
+          gap: 6px;
+          padding: 8px 14px;
+          border-radius: 9px;
+          border: 1px solid transparent;
+          cursor: pointer;
+          transition: all 0.18s ease;
+          font-family: 'DM Sans', sans-serif;
+          font-size: 12px;
+          font-weight: 500;
+          background: transparent;
+          color: #8888aa;
+          white-space: nowrap;
+          flex-shrink: 0;
+        }
+        .plan-tab-btn:hover { color: #c8c8ee; border-color: rgba(108,99,255,0.15); }
+        .plan-tab-btn.active { background: rgba(108,99,255,0.12); color: #a594ff; border-color: rgba(108,99,255,0.28); }
+      `}</style>
 
-      {/* Navbar */}
-      <div style={{
-        background: "rgba(10,10,10,0.95)", borderBottom: "1px solid #1a1a1a",
-        padding: "0.9rem 1.5rem", display: "flex", justifyContent: "space-between",
-        alignItems: "center", position: "sticky", top: 0, zIndex: 100, backdropFilter: "blur(12px)",
-      }}>
-        <span style={{
-          fontFamily: "'Playfair Display', serif", fontSize: "1.1rem", fontWeight: 900,
-          background: "linear-gradient(135deg,#a78bfa,#ec4899)",
-          WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent",
-        }}>PeakMind</span>
-        <div style={{ display: "flex", gap: "0.5rem", flexWrap: "wrap" }}>
-          {[
-            { label: "Dashboard", path: "/dashboard" },
-            { label: "Schedule", path: "/schedule" },
-            { label: "Coach", path: "/coach" },
-            { label: "Progress", path: "/progress" },
-          ].map((item) => (
-            <button key={item.path} type="button" onClick={() => router.push(item.path)} style={{
-              padding: "0.4rem 0.85rem", background: "transparent", border: "1px solid #2a2a2a",
-              borderRadius: "8px", color: "#888", fontSize: "0.8rem", cursor: "pointer", transition: "all 0.15s",
-            }}
-              onMouseEnter={(e) => { e.currentTarget.style.borderColor = "#7c3aed"; e.currentTarget.style.color = "#a78bfa"; }}
-              onMouseLeave={(e) => { e.currentTarget.style.borderColor = "#2a2a2a"; e.currentTarget.style.color = "#888"; }}
-            >{item.label}</button>
-          ))}
-        </div>
+      {/* Ambient bg */}
+      <div style={{ position: "fixed", inset: 0, pointerEvents: "none", zIndex: 0 }}>
+        <div style={{ position: "absolute", top: "10%", right: "15%", width: "360px", height: "360px", borderRadius: "50%", background: "radial-gradient(circle, rgba(108,99,255,0.06) 0%, transparent 70%)", animation: "float 16s ease-in-out infinite" }} />
+        <div style={{ position: "absolute", bottom: "20%", left: "5%", width: "280px", height: "280px", borderRadius: "50%", background: "radial-gradient(circle, rgba(255,107,157,0.04) 0%, transparent 70%)", animation: "float 20s ease-in-out infinite reverse" }} />
       </div>
 
-      <div style={{ maxWidth: "860px", margin: "0 auto", padding: isMobile ? "2rem 1rem 0" : "2.5rem 1.5rem 0" }}>
+      <div style={{ minHeight: "100vh", background: "#080810", paddingBottom: "5rem", position: "relative", zIndex: 1 }}>
+        <div style={{ maxWidth: "1100px", margin: "0 auto", padding: isMobile ? "28px 16px 0" : "40px 32px 0" }}>
 
-        {/* Header */}
-        <div style={{ marginBottom: "2.5rem" }}>
-          <h1 style={{
-            fontFamily: "'Playfair Display', serif",
-            fontSize: isMobile ? "clamp(1.6rem,6vw,2rem)" : "clamp(1.8rem,3vw,2.4rem)",
-            fontWeight: 900, color: "#fff", margin: "0 0 0.5rem",
-          }}>
-            {studentProfile.name.split(" ")[0]}&apos;s Master Plan
-          </h1>
-          <p style={{ color: "#555", fontSize: "0.85rem", margin: 0 }}>
-            Generated {new Date(meta.generatedAt).toLocaleDateString("en-US", { day: "numeric", month: "long", year: "numeric" })} · v{meta.planVersion}
-          </p>
-        </div>
-
-        {/* ── 1. DIAGNOSIS ── */}
-        <div style={{ ...card, borderLeft: `3px solid ${urgencyColor}` }}>
-          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "1.25rem", flexWrap: "wrap", gap: "0.5rem" }}>
-            <h2 style={{ ...sectionTitle, margin: 0 }}>Diagnosis</h2>
-            <span style={{
-              padding: "0.25rem 0.75rem", borderRadius: "999px", fontSize: "0.72rem", fontWeight: 700,
-              textTransform: "uppercase", letterSpacing: "0.06em",
-              background: `${urgencyColor}18`, color: urgencyColor, border: `1px solid ${urgencyColor}33`,
-            }}>{diagnosis.urgencyLevel} urgency</span>
-          </div>
-
-          <div style={{ marginBottom: "1.25rem" }}>
-            <p style={lbl}>Psychological Profile</p>
-            <p style={{ color: "#d0d0d0", fontSize: "0.9rem", lineHeight: 1.7, margin: 0 }}>{diagnosis.psychologicalProfile}</p>
-          </div>
-
-          <div style={{ marginBottom: "1.25rem" }}>
-            <p style={lbl}>Key Insight</p>
-            <p style={{ color: "#d0d0d0", fontSize: "0.9rem", lineHeight: 1.7, margin: 0, borderLeft: "2px solid #7c3aed", paddingLeft: "1rem" }}>
-              {diagnosis.keyInsight}
+          {/* ── Header ── */}
+          <div className="stagger-1" style={{ marginBottom: "28px" }}>
+            <p style={{ color: "#44445a", fontSize: "11px", fontFamily: "'DM Mono', monospace", letterSpacing: "0.08em", marginBottom: "8px" }}>MASTER PLAN</p>
+            <h1 style={{ fontFamily: "'Syne', sans-serif", fontWeight: 800, fontSize: isMobile ? "1.8rem" : "2.2rem", color: "#f0f0ff", letterSpacing: "-0.03em", margin: "0 0 6px" }}>
+              {studentProfile.name.split(" ")[0]}&apos;s Blueprint
+            </h1>
+            <p style={{ color: "#44445a", fontSize: "12px", margin: 0, fontFamily: "'DM Mono', monospace" }}>
+              Generated {new Date(meta.generatedAt).toLocaleDateString("en-US", { day: "numeric", month: "long", year: "numeric" })} · v{meta.planVersion}
             </p>
           </div>
 
-          <div style={{ display: "grid", gridTemplateColumns: col2, gap: "1.25rem", marginBottom: "1.25rem" }}>
-            <div>
-              <p style={lbl}>Primary Problems</p>
-              <div style={{ display: "flex", flexDirection: "column", gap: "0.4rem" }}>
-                {(diagnosis.primaryProblems ?? []).map((p, i) => (
-                  <div key={i} style={{ display: "flex", gap: "0.6rem", alignItems: "flex-start" }}>
-                    <span style={{ color: "#f87171", flexShrink: 0, fontSize: "0.8rem", marginTop: "0.1rem" }}>✕</span>
-                    <span style={{ color: "#c0c0c0", fontSize: "0.83rem", lineHeight: 1.5 }}>{p}</span>
-                  </div>
+          {/* ── Mobile tab row ── */}
+          {isMobile && (
+            <div className="stagger-2" style={{ display: "flex", gap: "4px", overflowX: "auto", marginBottom: "20px", paddingBottom: "4px" }}>
+              {SECTIONS.map((s) => (
+                <button key={s.id} type="button" className={`plan-tab-btn${activeSection === s.id ? " active" : ""}`} onClick={() => setActiveSection(s.id)}>
+                  <span>{s.emoji}</span> {s.label}
+                </button>
+              ))}
+            </div>
+          )}
+
+          <div style={{ display: "flex", gap: "24px", alignItems: "flex-start" }}>
+
+            {/* ── Desktop sidebar ── */}
+            {!isMobile && (
+              <div className="stagger-2" style={{
+                width: "200px", flexShrink: 0, position: "sticky", top: "80px",
+                background: "#12121e", border: "1px solid #1e1e35", borderRadius: "16px", padding: "12px",
+                display: "flex", flexDirection: "column", gap: "4px",
+              }}>
+                {SECTIONS.map((s) => (
+                  <button key={s.id} type="button" className={`plan-sidebar-btn${activeSection === s.id ? " active" : ""}`} onClick={() => setActiveSection(s.id)}>
+                    <span style={{ fontSize: "15px" }}>{s.emoji}</span>
+                    <span>{s.label}</span>
+                  </button>
                 ))}
               </div>
-            </div>
-            <div>
-              <p style={lbl}>Root Causes</p>
-              <div style={{ display: "flex", flexDirection: "column", gap: "0.4rem" }}>
-                {(diagnosis.rootCauses ?? []).map((c, i) => (
-                  <div key={i} style={{ display: "flex", gap: "0.6rem", alignItems: "flex-start" }}>
-                    <span style={{ color: "#facc15", flexShrink: 0, fontSize: "0.8rem", marginTop: "0.1rem" }}>→</span>
-                    <span style={{ color: "#c0c0c0", fontSize: "0.83rem", lineHeight: 1.5 }}>{c}</span>
+            )}
+
+            {/* ── Main content ── */}
+            <div style={{ flex: 1, minWidth: 0 }}>
+
+              {/* ─────────── DIAGNOSIS ─────────── */}
+              {activeSection === "diagnosis" && (
+                <div className="stagger-3" style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
+
+                  {/* Key insight */}
+                  <div style={{ background: "rgba(108,99,255,0.04)", border: "1px solid #1e1e35", borderLeft: "3px solid #6c63ff", borderRadius: "16px", padding: "20px" }}>
+                    <p style={{ color: "#44445a", fontSize: "11px", fontFamily: "'DM Mono', monospace", letterSpacing: "0.06em", marginBottom: "10px" }}>KEY INSIGHT</p>
+                    <p style={{ color: "#c8c8ee", fontSize: "15px", fontStyle: "italic", lineHeight: 1.7, margin: 0 }}>
+                      &ldquo;{diagnosis.keyInsight}&rdquo;
+                    </p>
                   </div>
-                ))}
-              </div>
-            </div>
-          </div>
 
-          <div>
-            <p style={lbl}>Strengths</p>
-            <div>{(diagnosis.strengths ?? []).map((s) => pill(s, "#4ade80"))}</div>
-          </div>
-        </div>
-
-        {/* ── 2. STRATEGY ── */}
-        <div style={card}>
-          <h2 style={sectionTitle}>Study Strategy</h2>
-
-          <div style={{ display: "grid", gridTemplateColumns: col2, gap: "1.25rem", marginBottom: "1.25rem" }}>
-            <div style={{ background: "#141414", border: "1px solid #1e1e1e", borderRadius: "12px", padding: "1.1rem" }}>
-              <p style={lbl}>Primary Method</p>
-              <p style={{ color: "#fff", fontWeight: 700, fontSize: "0.95rem", margin: "0 0 0.35rem" }}>{strategy.primaryStudyMethod}</p>
-              <p style={{ color: "#888", fontSize: "0.8rem", margin: 0, lineHeight: 1.5 }}>{strategy.primaryMethodDescription}</p>
-            </div>
-            <div style={{ background: "#141414", border: "1px solid #1e1e1e", borderRadius: "12px", padding: "1.1rem" }}>
-              <p style={lbl}>Secondary Method</p>
-              <p style={{ color: "#fff", fontWeight: 700, fontSize: "0.95rem", margin: "0 0 0.5rem" }}>{strategy.secondaryMethod}</p>
-              <div style={{ display: "flex", gap: "0.75rem", flexWrap: "wrap" }}>
-                <span style={{ color: "#a78bfa", fontSize: "0.8rem" }}>{strategy.weeklyStudyHours}h/week</span>
-                <span style={{ color: "#60a5fa", fontSize: "0.8rem" }}>{strategy.sessionLength}min sessions</span>
-                <span style={{ color: "#4ade80", fontSize: "0.8rem" }}>{strategy.breakDuration}min breaks</span>
-              </div>
-            </div>
-          </div>
-
-          {/* Stats row */}
-          <div style={{ display: "grid", gridTemplateColumns: isMobile ? "repeat(3,1fr)" : "repeat(3,1fr)", gap: "0.75rem", marginBottom: "1.5rem" }}>
-            {[
-              { label: "Weekly Hours", value: strategy.weeklyStudyHours, unit: "hrs/week", color: "#a78bfa" },
-              { label: "Session Length", value: strategy.sessionLength, unit: "minutes", color: "#60a5fa" },
-              { label: "Break Duration", value: strategy.breakDuration, unit: "minutes", color: "#4ade80" },
-            ].map((s) => (
-              <div key={s.label} style={{ background: "#141414", border: "1px solid #1e1e1e", borderRadius: "12px", padding: "0.85rem", textAlign: "center" }}>
-                <div style={{ fontSize: "1.5rem", fontWeight: 800, color: s.color }}>{s.value}</div>
-                <div style={{ color: "#555", fontSize: "0.68rem", marginTop: "0.1rem" }}>{s.unit}</div>
-                <div style={{ color: "#888", fontSize: "0.72rem", marginTop: "0.1rem" }}>{s.label}</div>
-              </div>
-            ))}
-          </div>
-
-          <p style={lbl}>Subject Breakdown</p>
-          <div style={{ display: "flex", flexDirection: "column", gap: "0.6rem" }}>
-            {(strategy.subjects ?? []).map((sub) => {
-              const pc = PRIORITY_COLOR[sub.priority] ?? "#a78bfa";
-              return (
-                <div key={sub.subject} style={{
-                  display: "flex", alignItems: "center", gap: "0.75rem", flexWrap: isMobile ? "wrap" : "nowrap",
-                  padding: "0.85rem 1rem", background: "#141414", border: "1px solid #1e1e1e", borderRadius: "10px",
-                  transition: "all 0.15s",
-                }}>
-                  <span style={{ padding: "0.2rem 0.6rem", borderRadius: "6px", fontSize: "0.68rem", fontWeight: 700, textTransform: "uppercase", background: `${pc}18`, color: pc, border: `1px solid ${pc}33`, flexShrink: 0 }}>{sub.priority}</span>
-                  <div style={{ flex: 1, minWidth: "100px" }}>
-                    <div style={{ fontWeight: 600, fontSize: "0.875rem", color: "#e0e0e0", marginBottom: "0.1rem" }}>{sub.subject}</div>
-                    {!isMobile && <div style={{ fontSize: "0.73rem", color: "#666" }}>{sub.reason}</div>}
+                  {/* Psych profile */}
+                  <div className="plan-card">
+                    <p style={{ color: "#44445a", fontSize: "11px", fontFamily: "'DM Mono', monospace", letterSpacing: "0.06em", marginBottom: "10px" }}>PSYCHOLOGICAL PROFILE</p>
+                    <p style={{ color: "#c8c8ee", fontSize: "14px", lineHeight: 1.7, margin: 0 }}>{diagnosis.psychologicalProfile}</p>
                   </div>
-                  <div style={{ textAlign: "right", flexShrink: 0 }}>
-                    <div style={{ fontSize: "0.85rem", fontWeight: 700, color: "#a78bfa" }}>{sub.weeklyHours}h/wk</div>
-                    <div style={{ fontSize: "0.68rem", color: "#555" }}>{sub.recommendedMethod}</div>
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        </div>
 
-        {/* ── 3. DISTRACTION CONTROL ── */}
-        <div style={card}>
-          <h2 style={sectionTitle}>Distraction Control</h2>
-
-          <div style={{ display: "grid", gridTemplateColumns: col2, gap: "1.25rem", marginBottom: "1.25rem" }}>
-            <div>
-              <p style={lbl}>Blocking Rules</p>
-              <div style={{ display: "flex", flexDirection: "column", gap: "0.4rem" }}>
-                {(distractionControl?.blockingRules ?? []).map((r, i) => (
-                  <div key={i} style={{ display: "flex", gap: "0.6rem", alignItems: "flex-start" }}>
-                    <span style={{ color: "#7c3aed", flexShrink: 0, fontSize: "0.85rem" }}>◈</span>
-                    <span style={{ color: "#c0c0c0", fontSize: "0.83rem", lineHeight: 1.5 }}>{r}</span>
-                  </div>
-                ))}
-              </div>
-            </div>
-            <div>
-              <p style={lbl}>Environment Setup</p>
-              <div style={{ display: "flex", flexDirection: "column", gap: "0.4rem" }}>
-                {(distractionControl?.environmentSetup ?? []).map((e, i) => (
-                  <div key={i} style={{ display: "flex", gap: "0.6rem", alignItems: "flex-start" }}>
-                    <span style={{ color: "#4ade80", flexShrink: 0, fontSize: "0.85rem" }}>✓</span>
-                    <span style={{ color: "#c0c0c0", fontSize: "0.83rem", lineHeight: 1.5 }}>{e}</span>
-                  </div>
-                ))}
-              </div>
-            </div>
-          </div>
-
-          <div style={{ display: "grid", gridTemplateColumns: col2, gap: "1rem", marginBottom: "1.25rem" }}>
-            <div style={{ background: "#141414", border: "1px solid #1e1e1e", borderRadius: "12px", padding: "1rem" }}>
-              <p style={{ ...lbl, color: "#fb923c" }}>Phone Policy</p>
-              <p style={{ color: "#d0d0d0", fontSize: "0.82rem", margin: 0, lineHeight: 1.6 }}>{distractionControl?.phonePolicy}</p>
-            </div>
-            <div style={{ background: "rgba(248,113,113,0.06)", border: "1px solid rgba(248,113,113,0.15)", borderRadius: "12px", padding: "1rem" }}>
-              <p style={{ ...lbl, color: "#f87171" }}>Emergency Protocol</p>
-              <p style={{ color: "#d0d0d0", fontSize: "0.82rem", margin: 0, lineHeight: 1.6 }}>{distractionControl?.emergencyProtocol}</p>
-            </div>
-          </div>
-
-          <p style={lbl}>Top Distractions to Beat</p>
-          <div>{(distractionControl?.topDistractions ?? []).map((d) => pill(d, "#f87171"))}</div>
-        </div>
-
-        {/* ── 4. RESOURCES ── */}
-        <div style={card}>
-          <h2 style={sectionTitle}>Curated Resources</h2>
-
-          <p style={lbl}>Books</p>
-          <div style={{ display: "flex", flexDirection: "column", gap: "0.6rem", marginBottom: "1.5rem" }}>
-            {(resources?.books ?? []).map((b, i) => (
-              <div key={i} style={{ display: "flex", gap: "0.85rem", padding: "0.85rem", background: "#141414", border: "1px solid #1e1e1e", borderRadius: "10px", alignItems: "flex-start", transition: "all 0.15s" }}>
-                <div style={{ width: "32px", height: "32px", borderRadius: "8px", background: "rgba(124,58,237,0.15)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "0.9rem", flexShrink: 0 }}>📚</div>
-                <div>
-                  <div style={{ fontWeight: 600, fontSize: "0.875rem", color: "#e0e0e0" }}>{b.title}{b.author && <span style={{ color: "#555", fontWeight: 400 }}> — {b.author}</span>}</div>
-                  <div style={{ fontSize: "0.78rem", color: "#666", marginTop: "0.2rem", lineHeight: 1.5 }}>{b.reason}</div>
-                </div>
-              </div>
-            ))}
-          </div>
-
-          <p style={lbl}>Techniques</p>
-          <div style={{ display: "grid", gridTemplateColumns: col2, gap: "0.75rem", marginBottom: "1.5rem" }}>
-            {(resources?.techniques ?? []).map((t, i) => (
-              <div key={i} style={{ padding: "1rem", background: "#141414", border: "1px solid #1e1e1e", borderRadius: "12px", transition: "all 0.15s" }}>
-                <div style={{ fontWeight: 700, fontSize: "0.875rem", color: "#a78bfa", marginBottom: "0.3rem" }}>{t.name}</div>
-                <div style={{ fontSize: "0.78rem", color: "#888", marginBottom: "0.5rem", lineHeight: 1.5 }}>{t.description}</div>
-                <div style={{ fontSize: "0.73rem", color: "#555", lineHeight: 1.5, borderTop: "1px solid #1e1e1e", paddingTop: "0.5rem" }}>
-                  <span style={{ color: "#4ade80", fontWeight: 600 }}>How: </span>{t.howToUse}
-                </div>
-              </div>
-            ))}
-          </div>
-
-          <div style={{ display: "grid", gridTemplateColumns: col2, gap: "1.25rem" }}>
-            <div>
-              <p style={lbl}>Podcasts</p>
-              <div style={{ display: "flex", flexDirection: "column", gap: "0.5rem" }}>
-                {(resources?.podcasts ?? []).map((p, i) => (
-                  <div key={i} style={{ padding: "0.65rem 0.85rem", background: "#141414", border: "1px solid #1e1e1e", borderRadius: "10px" }}>
-                    <div style={{ fontWeight: 600, fontSize: "0.82rem", color: "#e0e0e0", marginBottom: "0.15rem" }}>🎙 {p.title}</div>
-                    <div style={{ fontSize: "0.73rem", color: "#666" }}>{p.reason}</div>
-                  </div>
-                ))}
-              </div>
-            </div>
-            <div>
-              <p style={lbl}>Tools</p>
-              <div style={{ display: "flex", flexDirection: "column", gap: "0.5rem" }}>
-                {(resources?.tools ?? []).map((t, i) => (
-                  <div key={i} style={{ padding: "0.65rem 0.85rem", background: "#141414", border: "1px solid #1e1e1e", borderRadius: "10px", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                    <div>
-                      <div style={{ fontWeight: 600, fontSize: "0.82rem", color: "#e0e0e0", marginBottom: "0.1rem" }}>🛠 {t.name}</div>
-                      <div style={{ fontSize: "0.73rem", color: "#666" }}>{t.purpose}</div>
+                  {/* Problems + Strengths */}
+                  <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "1fr 1fr", gap: "14px" }}>
+                    <div className="plan-card" style={{ borderLeft: "2px solid #ff6b9d" }}>
+                      <p style={{ color: "#44445a", fontSize: "11px", fontFamily: "'DM Mono', monospace", letterSpacing: "0.06em", marginBottom: "12px" }}>PRIMARY PROBLEMS</p>
+                      <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
+                        {(diagnosis.primaryProblems ?? []).map((p, i) => (
+                          <div key={i} style={{ display: "flex", gap: "8px", alignItems: "flex-start" }}>
+                            <span style={{ color: "#ff6b9d", flexShrink: 0, fontSize: "12px", marginTop: "2px" }}>✕</span>
+                            <span style={{ color: "#c8c8ee", fontSize: "13px", lineHeight: 1.5 }}>{p}</span>
+                          </div>
+                        ))}
+                      </div>
                     </div>
-                    <span style={{ fontSize: "0.65rem", padding: "0.15rem 0.45rem", borderRadius: "999px", background: t.free ? "rgba(74,222,128,0.1)" : "rgba(251,146,60,0.1)", color: t.free ? "#4ade80" : "#fb923c", border: `1px solid ${t.free ? "#4ade8033" : "#fb923c33"}`, flexShrink: 0 }}>{t.free ? "Free" : "Paid"}</span>
+                    <div className="plan-card" style={{ borderLeft: "2px solid #00d4aa" }}>
+                      <p style={{ color: "#44445a", fontSize: "11px", fontFamily: "'DM Mono', monospace", letterSpacing: "0.06em", marginBottom: "12px" }}>STRENGTHS</p>
+                      <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
+                        {(diagnosis.strengths ?? []).map((s, i) => (
+                          <div key={i} style={{ display: "flex", gap: "8px", alignItems: "flex-start" }}>
+                            <span style={{ color: "#00d4aa", flexShrink: 0, fontSize: "12px", marginTop: "2px" }}>✓</span>
+                            <span style={{ color: "#c8c8ee", fontSize: "13px", lineHeight: 1.5 }}>{s}</span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
                   </div>
-                ))}
-              </div>
+
+                  {/* Root causes */}
+                  <div className="plan-card" style={{ borderLeft: "2px solid #ffb347" }}>
+                    <p style={{ color: "#44445a", fontSize: "11px", fontFamily: "'DM Mono', monospace", letterSpacing: "0.06em", marginBottom: "12px" }}>ROOT CAUSES</p>
+                    <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
+                      {(diagnosis.rootCauses ?? []).map((c, i) => (
+                        <div key={i} style={{ display: "flex", gap: "8px", alignItems: "flex-start" }}>
+                          <span style={{ color: "#ffb347", flexShrink: 0, fontSize: "13px" }}>→</span>
+                          <span style={{ color: "#c8c8ee", fontSize: "13px", lineHeight: 1.5 }}>{c}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* ─────────── STRATEGY ─────────── */}
+              {activeSection === "strategy" && (
+                <div className="stagger-3" style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
+
+                  {/* Primary + Secondary method */}
+                  <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "1fr 1fr", gap: "14px" }}>
+                    <div className="plan-card" style={{ background: "rgba(108,99,255,0.06)", borderColor: "rgba(108,99,255,0.2)" }}>
+                      <p style={{ color: "#44445a", fontSize: "11px", fontFamily: "'DM Mono', monospace", letterSpacing: "0.06em", marginBottom: "10px" }}>PRIMARY METHOD</p>
+                      <p style={{ color: "#f0f0ff", fontFamily: "'Syne', sans-serif", fontWeight: 700, fontSize: "15px", margin: "0 0 8px" }}>{strategy.primaryStudyMethod}</p>
+                      <p style={{ color: "#8888aa", fontSize: "13px", lineHeight: 1.6, margin: 0 }}>{strategy.primaryMethodDescription}</p>
+                    </div>
+                    <div className="plan-card">
+                      <p style={{ color: "#44445a", fontSize: "11px", fontFamily: "'DM Mono', monospace", letterSpacing: "0.06em", marginBottom: "10px" }}>SECONDARY METHOD</p>
+                      <p style={{ color: "#f0f0ff", fontFamily: "'Syne', sans-serif", fontWeight: 700, fontSize: "15px", margin: "0 0 12px" }}>{strategy.secondaryMethod}</p>
+                      <div style={{ display: "flex", gap: "8px", flexWrap: "wrap" }}>
+                        {[
+                          { label: `${strategy.weeklyStudyHours}h/week`, color: "#a594ff" },
+                          { label: `${strategy.sessionLength}min sessions`, color: "#00d4aa" },
+                          { label: `${strategy.breakDuration}min breaks`, color: "#ffb347" },
+                        ].map(({ label, color }) => (
+                          <span key={label} style={{ padding: "3px 10px", borderRadius: "999px", fontSize: "12px", background: `${color}15`, border: `1px solid ${color}30`, color, fontFamily: "'DM Mono', monospace" }}>{label}</span>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Subject priority */}
+                  <div className="plan-card">
+                    <p style={{ color: "#44445a", fontSize: "11px", fontFamily: "'DM Mono', monospace", letterSpacing: "0.06em", marginBottom: "14px" }}>SUBJECT PRIORITY</p>
+                    <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
+                      {(strategy.subjects ?? []).map((sub, i) => {
+                        const pc = PRIORITY_COLOR[sub.priority] ?? "#a594ff";
+                        return (
+                          <div key={sub.subject} style={{ display: "flex", alignItems: "center", gap: "12px", padding: "12px 14px", background: "#0f0f1a", border: "1px solid #1e1e35", borderRadius: "12px" }}>
+                            <span style={{ fontFamily: "'DM Mono', monospace", fontSize: "13px", fontWeight: 700, color: "#44445a", minWidth: "20px" }}>#{i + 1}</span>
+                            <span style={{ padding: "2px 8px", borderRadius: "6px", fontSize: "10px", fontWeight: 700, textTransform: "uppercase", background: `${pc}18`, color: pc, border: `1px solid ${pc}33`, flexShrink: 0 }}>{sub.priority}</span>
+                            <div style={{ flex: 1, minWidth: 0 }}>
+                              <div style={{ fontWeight: 600, fontSize: "14px", color: "#f0f0ff" }}>{sub.subject}</div>
+                              <div style={{ fontSize: "12px", color: "#8888aa", marginTop: "2px" }}>{sub.reason}</div>
+                            </div>
+                            <div style={{ textAlign: "right", flexShrink: 0 }}>
+                              <div style={{ fontFamily: "'DM Mono', monospace", fontSize: "13px", fontWeight: 700, color: "#a594ff" }}>{sub.weeklyHours}h/wk</div>
+                              <div style={{ fontSize: "11px", color: "#44445a" }}>{sub.recommendedMethod}</div>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* ─────────── HABITS ─────────── */}
+              {activeSection === "habits" && (
+                <div className="stagger-3" style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
+
+                  <div className="plan-card">
+                    <p style={{ color: "#44445a", fontSize: "11px", fontFamily: "'DM Mono', monospace", letterSpacing: "0.06em", marginBottom: "14px" }}>HABIT SYSTEM</p>
+                    <div style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
+                      {(masterPlan.habitSystem ?? []).map((habit, i) => (
+                        <div key={habit.id} style={{ padding: "14px 16px", background: "#0f0f1a", border: "1px solid #1e1e35", borderRadius: "12px", animationDelay: `${i * 0.05}s` }}>
+                          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: "8px", marginBottom: "8px" }}>
+                            <div style={{ fontWeight: 600, fontSize: "14px", color: "#f0f0ff", lineHeight: 1.4 }}>{habit.habit}</div>
+                            <div style={{ display: "flex", gap: "6px", flexShrink: 0 }}>
+                              <span style={{ padding: "2px 8px", borderRadius: "999px", fontSize: "10px", background: "rgba(108,99,255,0.12)", border: "1px solid rgba(108,99,255,0.2)", color: "#a594ff", fontFamily: "'DM Mono', monospace" }}>{habit.category}</span>
+                              <span style={{ padding: "2px 8px", borderRadius: "999px", fontSize: "10px", background: habit.frequency === "daily" ? "rgba(0,212,170,0.1)" : "rgba(255,179,71,0.1)", border: `1px solid ${habit.frequency === "daily" ? "rgba(0,212,170,0.2)" : "rgba(255,179,71,0.2)"}`, color: habit.frequency === "daily" ? "#00d4aa" : "#ffb347", fontFamily: "'DM Mono', monospace" }}>{habit.frequency}</span>
+                            </div>
+                          </div>
+                          <p style={{ color: "#8888aa", fontSize: "12px", margin: 0, lineHeight: 1.5, fontStyle: "italic" }}>{habit.whyItMatters}</p>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Distraction control */}
+                  {distractionControl && (
+                    <div className="plan-card" style={{ borderLeft: "2px solid #ff6b9d" }}>
+                      <p style={{ color: "#44445a", fontSize: "11px", fontFamily: "'DM Mono', monospace", letterSpacing: "0.06em", marginBottom: "14px" }}>DISTRACTION CONTROL</p>
+                      <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
+                        {(distractionControl.blockingRules ?? []).map((r, i) => (
+                          <div key={i} style={{ display: "flex", gap: "8px", padding: "8px 12px", background: "rgba(255,107,157,0.04)", border: "1px solid rgba(255,107,157,0.12)", borderRadius: "10px" }}>
+                            <span style={{ color: "#ff6b9d", flexShrink: 0 }}>◈</span>
+                            <span style={{ color: "#c8c8ee", fontSize: "13px", lineHeight: 1.5 }}>{r}</span>
+                          </div>
+                        ))}
+                      </div>
+                      {distractionControl.emergencyProtocol && (
+                        <div style={{ marginTop: "14px", padding: "12px 14px", background: "rgba(255,107,157,0.06)", border: "1px solid rgba(255,107,157,0.18)", borderRadius: "10px" }}>
+                          <p style={{ color: "#ff6b9d", fontSize: "11px", fontFamily: "'DM Mono', monospace", marginBottom: "6px" }}>EMERGENCY PROTOCOL</p>
+                          <p style={{ color: "#c8c8ee", fontSize: "13px", margin: 0, lineHeight: 1.5 }}>{distractionControl.emergencyProtocol}</p>
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* ─────────── RESOURCES ─────────── */}
+              {activeSection === "resources" && (
+                <div className="stagger-3" style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
+
+                  {/* Books */}
+                  {(resources?.books ?? []).length > 0 && (
+                    <div className="plan-card">
+                      <p style={{ color: "#44445a", fontSize: "11px", fontFamily: "'DM Mono', monospace", letterSpacing: "0.06em", marginBottom: "14px" }}>BOOKS</p>
+                      <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
+                        {(resources?.books ?? []).map((b, i) => (
+                          <div key={i} style={{ display: "flex", gap: "12px", padding: "12px 14px", background: "#0f0f1a", border: "1px solid #1e1e35", borderRadius: "12px", alignItems: "flex-start" }}>
+                            <div style={{ width: "34px", height: "34px", borderRadius: "9px", background: "rgba(108,99,255,0.12)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "16px", flexShrink: 0 }}>📚</div>
+                            <div>
+                              <div style={{ fontWeight: 600, fontSize: "14px", color: "#f0f0ff", marginBottom: "2px" }}>
+                                {b.title}{b.author && <span style={{ color: "#44445a", fontWeight: 400 }}> — {b.author}</span>}
+                              </div>
+                              <div style={{ fontSize: "12px", color: "#8888aa", lineHeight: 1.5 }}>{b.reason}</div>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Techniques */}
+                  {(resources?.techniques ?? []).length > 0 && (
+                    <div className="plan-card">
+                      <p style={{ color: "#44445a", fontSize: "11px", fontFamily: "'DM Mono', monospace", letterSpacing: "0.06em", marginBottom: "14px" }}>TECHNIQUES</p>
+                      <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "1fr 1fr", gap: "10px" }}>
+                        {(resources?.techniques ?? []).map((t, i) => (
+                          <div key={i} style={{ padding: "14px 16px", background: "#0f0f1a", border: "1px solid #1e1e35", borderRadius: "12px" }}>
+                            <div style={{ fontFamily: "'Syne', sans-serif", fontWeight: 700, fontSize: "14px", color: "#a594ff", marginBottom: "6px" }}>{t.name}</div>
+                            <div style={{ fontSize: "13px", color: "#8888aa", lineHeight: 1.5, marginBottom: "8px" }}>{t.description}</div>
+                            <div style={{ fontSize: "12px", color: "#c8c8ee", lineHeight: 1.5, borderTop: "1px solid #1e1e35", paddingTop: "8px" }}>
+                              <span style={{ color: "#00d4aa", fontWeight: 600 }}>How: </span>{t.howToUse}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Tools */}
+                  {(resources?.tools ?? []).length > 0 && (
+                    <div className="plan-card">
+                      <p style={{ color: "#44445a", fontSize: "11px", fontFamily: "'DM Mono', monospace", letterSpacing: "0.06em", marginBottom: "14px" }}>TOOLS</p>
+                      <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
+                        {(resources?.tools ?? []).map((t, i) => (
+                          <div key={i} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "10px 14px", background: "#0f0f1a", border: "1px solid #1e1e35", borderRadius: "12px" }}>
+                            <div>
+                              <div style={{ fontWeight: 600, fontSize: "13px", color: "#f0f0ff", marginBottom: "2px" }}>🛠 {t.name}</div>
+                              <div style={{ fontSize: "12px", color: "#8888aa" }}>{t.purpose}</div>
+                            </div>
+                            <span style={{
+                              padding: "3px 10px", borderRadius: "999px", fontSize: "11px", flexShrink: 0,
+                              background: t.free ? "rgba(0,212,170,0.1)" : "rgba(255,179,71,0.1)",
+                              color: t.free ? "#00d4aa" : "#ffb347",
+                              border: `1px solid ${t.free ? "rgba(0,212,170,0.2)" : "rgba(255,179,71,0.2)"}`,
+                              fontFamily: "'DM Mono', monospace",
+                            }}>{t.free ? "Free" : "Paid"}</span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* ─────────── WEEKLY REVIEW ─────────── */}
+              {activeSection === "review" && (
+                <div className="stagger-3" style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
+
+                  <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "1fr 1fr", gap: "14px" }}>
+                    {/* Checklist */}
+                    <div className="plan-card">
+                      <p style={{ color: "#44445a", fontSize: "11px", fontFamily: "'DM Mono', monospace", letterSpacing: "0.06em", marginBottom: "14px" }}>WEEKLY CHECKLIST</p>
+                      <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
+                        {(weeklyReview?.checklistItems ?? []).map((item, i) => (
+                          <div key={i} style={{ display: "flex", gap: "10px", alignItems: "flex-start" }}>
+                            <div style={{ width: "16px", height: "16px", borderRadius: "4px", border: "2px solid #2a2a45", flexShrink: 0, marginTop: "2px" }} />
+                            <span style={{ color: "#c8c8ee", fontSize: "13px", lineHeight: 1.5 }}>{item}</span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+
+                    {/* Reflection questions */}
+                    <div className="plan-card">
+                      <p style={{ color: "#44445a", fontSize: "11px", fontFamily: "'DM Mono', monospace", letterSpacing: "0.06em", marginBottom: "14px" }}>REFLECTION QUESTIONS</p>
+                      <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
+                        {(weeklyReview?.reviewQuestions ?? []).map((q, i) => (
+                          <div key={i} style={{ padding: "10px 13px", background: "#0f0f1a", border: "1px solid #1e1e35", borderRadius: "10px" }}>
+                            <span style={{ color: "#a594ff", fontSize: "10px", fontFamily: "'DM Mono', monospace", fontWeight: 700 }}>Q{i + 1}  </span>
+                            <span style={{ color: "#c8c8ee", fontSize: "13px", lineHeight: 1.5 }}>{q}</span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Progress metrics */}
+                  {(weeklyReview?.progressMetrics ?? []).length > 0 && (
+                    <div className="plan-card">
+                      <p style={{ color: "#44445a", fontSize: "11px", fontFamily: "'DM Mono', monospace", letterSpacing: "0.06em", marginBottom: "14px" }}>PROGRESS METRICS</p>
+                      <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
+                        {(weeklyReview?.progressMetrics ?? []).map((m) => {
+                          const pct = m.target > 0 ? Math.min(100, (m.current / m.target) * 100) : 0;
+                          return (
+                            <div key={m.metric} style={{ display: "flex", alignItems: "center", gap: "14px", padding: "10px 14px", background: "#0f0f1a", border: "1px solid #1e1e35", borderRadius: "12px" }}>
+                              <div style={{ flex: 1, minWidth: 0 }}>
+                                <div style={{ fontSize: "13px", fontWeight: 600, color: "#f0f0ff", marginBottom: "6px" }}>{m.metric}</div>
+                                <div style={{ height: "4px", background: "#1e1e35", borderRadius: "999px", overflow: "hidden" }}>
+                                  <div style={{ height: "100%", width: `${pct}%`, background: "linear-gradient(90deg, #6c63ff, #a594ff)", borderRadius: "999px", transition: "width 0.6s ease" }} />
+                                </div>
+                              </div>
+                              <div style={{ textAlign: "right", flexShrink: 0 }}>
+                                <span style={{ fontFamily: "'DM Mono', monospace", fontSize: "12px", color: "#a594ff", fontWeight: 700 }}>{m.current}/{m.target}</span>
+                                <div style={{ fontSize: "10px", color: "#44445a" }}>{m.unit}</div>
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
+
             </div>
           </div>
         </div>
-
-        {/* ── 5. WEEKLY REVIEW ── */}
-        <div style={card}>
-          <h2 style={sectionTitle}>Weekly Review System</h2>
-
-          <div style={{ display: "grid", gridTemplateColumns: col2, gap: "1.5rem", marginBottom: "1.5rem" }}>
-            <div>
-              <p style={lbl}>Weekly Checklist</p>
-              <div style={{ display: "flex", flexDirection: "column", gap: "0.5rem" }}>
-                {(weeklyReview?.checklistItems ?? []).map((item, i) => (
-                  <div key={i} style={{ display: "flex", gap: "0.65rem", alignItems: "flex-start" }}>
-                    <div style={{ width: "16px", height: "16px", borderRadius: "4px", border: "2px solid #333", flexShrink: 0, marginTop: "2px" }} />
-                    <span style={{ color: "#c0c0c0", fontSize: "0.83rem", lineHeight: 1.5 }}>{item}</span>
-                  </div>
-                ))}
-              </div>
-            </div>
-            <div>
-              <p style={lbl}>Reflection Questions</p>
-              <div style={{ display: "flex", flexDirection: "column", gap: "0.6rem" }}>
-                {(weeklyReview?.reviewQuestions ?? []).map((q, i) => (
-                  <div key={i} style={{ padding: "0.65rem 0.85rem", background: "#141414", border: "1px solid #1e1e1e", borderRadius: "8px" }}>
-                    <span style={{ color: "#a78bfa", fontSize: "0.7rem", fontWeight: 700 }}>Q{i + 1}  </span>
-                    <span style={{ color: "#c0c0c0", fontSize: "0.8rem", lineHeight: 1.5 }}>{q}</span>
-                  </div>
-                ))}
-              </div>
-            </div>
-          </div>
-
-          <p style={lbl}>Progress Metrics</p>
-          <div style={{ display: "flex", flexDirection: "column", gap: "0.5rem" }}>
-            {(weeklyReview?.progressMetrics ?? []).map((m) => (
-              <div key={m.metric} style={{ display: "flex", alignItems: "center", gap: "1rem", padding: "0.7rem 1rem", background: "#141414", border: "1px solid #1e1e1e", borderRadius: "10px" }}>
-                <div style={{ flex: 1, minWidth: 0 }}>
-                  <div style={{ fontSize: "0.82rem", fontWeight: 600, color: "#e0e0e0", marginBottom: "0.3rem" }}>{m.metric}</div>
-                  <div style={{ height: "4px", background: "#1e1e1e", borderRadius: "999px", overflow: "hidden" }}>
-                    <div style={{ height: "100%", width: `${Math.min(100, m.target > 0 ? (m.current / m.target) * 100 : 0)}%`, background: "linear-gradient(90deg,#7c3aed,#a78bfa)", borderRadius: "999px", transition: "width 0.6s ease" }} />
-                  </div>
-                </div>
-                <div style={{ textAlign: "right", flexShrink: 0 }}>
-                  <span style={{ fontSize: "0.75rem", color: "#a78bfa", fontWeight: 600 }}>{m.current} / {m.target}</span>
-                  <div style={{ fontSize: "0.65rem", color: "#555" }}>{m.unit}</div>
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-
       </div>
-    </div>
+    </>
   );
 }
