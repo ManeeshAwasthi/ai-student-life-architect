@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import Anthropic from "@anthropic-ai/sdk";
+import { GoogleGenerativeAI } from "@google/generative-ai";
 import type { StudentProfile, MasterPlan, Diagnosis, Strategy } from "@/lib/types";
 import {
   JSON_SYSTEM_PROMPT,
@@ -11,30 +11,28 @@ import {
   buildWeeklyReviewPrompt,
 } from "@/lib/prompts";
 
-const anthropic = new Anthropic({
-  apiKey: process.env.ANTHROPIC_API_KEY,
-});
+const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY ?? "");
 
 function safeParseJSON(text: string): unknown {
   try {
-    const cleaned = text.replace(/```json\n?/g, "").replace(/```\n?/g, "").trim();
+    const cleaned = text
+      .replace(/```json\n?/g, "")
+      .replace(/```\n?/g, "")
+      .trim();
     return JSON.parse(cleaned);
   } catch {
-    throw new Error(`Failed to parse AI response: ${text.slice(0, 200)}`);
+    throw new Error(`Failed to parse response: ${text.slice(0, 200)}`);
   }
 }
 
-async function callClaude(prompt: string): Promise<unknown> {
-  const response = await anthropic.messages.create({
-    model: "claude-sonnet-4-5",
-    max_tokens: 2000,
-    system: JSON_SYSTEM_PROMPT,
-    messages: [{ role: "user", content: prompt }],
+async function callGemini(prompt: string): Promise<unknown> {
+  const model = genAI.getGenerativeModel({
+    model: "gemini-1.5-flash",
+    systemInstruction: JSON_SYSTEM_PROMPT,
   });
-  const text = response.content
-    .filter((block) => block.type === "text")
-    .map((block) => (block as { type: "text"; text: string }).text)
-    .join("");
+
+  const result = await model.generateContent(prompt);
+  const text = result.response.text();
   return safeParseJSON(text);
 }
 
@@ -56,33 +54,33 @@ export async function POST(request: NextRequest) {
 
         try {
           send({ step: "diagnosis", status: "active" });
-          const diagnosis = await callClaude(buildDiagnosisPrompt(profile)) as Diagnosis;
+          const diagnosis = await callGemini(buildDiagnosisPrompt(profile)) as Diagnosis;
           send({ step: "diagnosis", status: "complete" });
 
           send({ step: "strategy", status: "active" });
-          const strategy = await callClaude(buildStrategyPrompt(profile, diagnosis)) as Strategy;
+          const strategy = await callGemini(buildStrategyPrompt(profile, diagnosis)) as Strategy;
           send({ step: "strategy", status: "complete" });
 
           send({ step: "schedule", status: "active" });
-          const schedule = await callClaude(buildSchedulePrompt(profile, strategy)) as {
+          const schedule = await callGemini(buildSchedulePrompt(profile, strategy)) as {
             dailyRoutine: MasterPlan["dailyRoutine"];
             weeklySchedule: MasterPlan["weeklySchedule"];
           };
           send({ step: "schedule", status: "complete" });
 
           send({ step: "systems", status: "active" });
-          const systems = await callClaude(buildSystemsPrompt(profile, diagnosis, strategy)) as {
+          const systems = await callGemini(buildSystemsPrompt(profile, diagnosis, strategy)) as {
             habitSystem: MasterPlan["habitSystem"];
             distractionControl: MasterPlan["distractionControl"];
           };
           send({ step: "systems", status: "complete" });
 
           send({ step: "resources", status: "active" });
-          const resources = await callClaude(buildResourcesPrompt(profile)) as MasterPlan["resources"];
+          const resources = await callGemini(buildResourcesPrompt(profile)) as MasterPlan["resources"];
           send({ step: "resources", status: "complete" });
 
           send({ step: "review", status: "active" });
-          const weeklyReview = await callClaude(buildWeeklyReviewPrompt(profile)) as MasterPlan["weeklyReview"];
+          const weeklyReview = await callGemini(buildWeeklyReviewPrompt(profile)) as MasterPlan["weeklyReview"];
           send({ step: "review", status: "complete" });
 
           const masterPlan: MasterPlan = {
