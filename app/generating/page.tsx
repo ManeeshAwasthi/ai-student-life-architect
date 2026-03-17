@@ -61,6 +61,7 @@ export default function GeneratingPage() {
     complete: "Your system is ready!",
   };
 
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => {
     if (!studentProfile || hasFetched.current) return;
     hasFetched.current = true;
