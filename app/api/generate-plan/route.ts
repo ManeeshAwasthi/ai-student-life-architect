@@ -1,4 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
+
+// Allow up to 5 minutes on Vercel Pro / self-hosted — prevents ERR_CONNECTION_RESET
+export const maxDuration = 300;
 import { getGeminiModel } from "@/lib/generative-ai";
 import type { StudentProfile, MasterPlan, Diagnosis, Strategy } from "@/lib/types";
 import {
@@ -87,8 +90,14 @@ export async function POST(request: NextRequest) {
 
     const stream = new ReadableStream({
       async start(controller) {
+        let closed = false;
         const send = (data: object) => {
-          controller.enqueue(encoder.encode(`data: ${JSON.stringify(data)}\n\n`));
+          if (closed) return;
+          try {
+            controller.enqueue(encoder.encode(`data: ${JSON.stringify(data)}\n\n`));
+          } catch {
+            closed = true;
+          }
         };
 
         try {
@@ -187,7 +196,10 @@ export async function POST(request: NextRequest) {
           console.error(`[generate-plan] FATAL: ${msg}`);
           send({ step: "error", status: "error", message: msg });
         } finally {
-          controller.close();
+          if (!closed) {
+            try { controller.close(); } catch { /* already closed */ }
+            closed = true;
+          }
         }
       },
     });
