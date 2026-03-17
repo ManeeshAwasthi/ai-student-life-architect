@@ -3,6 +3,7 @@
 import { useEffect, useState, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { useAppStore } from "@/lib/store";
+import type { MasterPlan } from "@/lib/types";
 
 interface Step {
   id: string;
@@ -72,86 +73,85 @@ export default function GeneratingPage() {
     hasFetched.current = true;
 
     const generate = async () => {
-      // 180-second safety timeout — shows error if nothing completes
       const abortController = new AbortController();
       const timeoutId = setTimeout(() => {
         abortController.abort();
-        console.error("[generating] 180s timeout — aborting");
         setHasError(true);
-        setErrorMessage("Generation timed out after 3 minutes. Please try again.");
+        setErrorMessage("Generation timed out. Please try again.");
         setSteps((prev) =>
           prev.map((s) => (s.status === "active" ? { ...s, status: "error" } : s))
         );
       }, 180_000);
 
-      try {
-        const response = await fetch("/api/generate-plan", {
+      const post = async (url: string, body: object) => {
+        const res = await fetch(url, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ profile: studentProfile }),
+          body: JSON.stringify(body),
           signal: abortController.signal,
         });
+        const data = await res.json();
+        if (!res.ok || data.error) throw new Error(data.error ?? `${url} failed`);
+        return data;
+      };
 
-        if (!response.ok || !response.body) {
-          console.error("[generating] Bad response:", response.status, response.statusText);
-          throw new Error(`Server error ${response.status}: ${response.statusText}`);
-        }
+      try {
+        // Step 1: Diagnosis (~20-30s)
+        updateStep("diagnosis", "active");
+        setCurrentMessage(MSG_MAP.diagnosis);
+        const { diagnosis } = await post("/api/generate-plan/diagnosis", { profile: studentProfile });
+        updateStep("diagnosis", "complete");
 
-        const reader = response.body.getReader();
-        const decoder = new TextDecoder();
-        let buffer = "";
+        // Step 2: Strategy (~20-30s)
+        updateStep("strategy", "active");
+        setCurrentMessage(MSG_MAP.strategy);
+        const { strategy } = await post("/api/generate-plan/strategy", { profile: studentProfile, diagnosis });
+        updateStep("strategy", "complete");
 
-        while (true) {
-          const { done, value } = await reader.read();
-          if (done) break;
-          buffer += decoder.decode(value, { stream: true });
-          const lines = buffer.split("\n");
-          buffer = lines.pop() ?? "";
+        // Steps 3-6: All parallel in one request (~30s)
+        updateStep("schedule", "active");
+        updateStep("systems", "active");
+        updateStep("resources", "active");
+        updateStep("review", "active");
+        setCurrentMessage("Building schedule, habits and resources in parallel…");
+        const parallel = await post("/api/generate-plan/parallel", { profile: studentProfile, diagnosis, strategy });
 
-          for (const line of lines) {
-            if (!line.startsWith("data: ")) continue;
-            const raw = line.slice(6).trim();
-            if (!raw) continue;
+        clearTimeout(timeoutId);
+        updateStep("schedule", "complete");
+        updateStep("systems", "complete");
+        updateStep("resources", "complete");
+        updateStep("review", "complete");
 
-            // Parse JSON separately so a throw here is caught by the OUTER catch
-            let data: Record<string, unknown>;
-            try {
-              data = JSON.parse(raw) as Record<string, unknown>;
-            } catch (parseErr) {
-              console.error("[generating] Failed to parse SSE line:", parseErr, raw);
-              continue; // skip malformed — but don't swallow server error events
-            }
+        const masterPlan: MasterPlan = {
+          diagnosis,
+          strategy,
+          dailyRoutine: parallel.dailyRoutine,
+          weeklySchedule: parallel.weeklySchedule,
+          habitSystem: parallel.habitSystem,
+          distractionControl: parallel.distractionControl,
+          resources: parallel.resources,
+          weeklyReview: parallel.weeklyReview,
+          meta: {
+            generatedAt: new Date().toISOString(),
+            studentName: studentProfile!.name,
+            planVersion: 1,
+          },
+        };
 
-            // Handle each event type — errors now properly propagate out
-            if (data.status === "error") {
-              const msg = (data.message as string) ?? "Generation failed";
-              console.error("[generating] Server error event:", msg);
-              throw new Error(msg);
-            } else if (data.status === "active") {
-              updateStep(data.step as string, "active");
-              setCurrentMessage(MSG_MAP[data.step as string] ?? "Working…");
-            } else if (data.status === "complete" && data.step !== "complete") {
-              updateStep(data.step as string, "complete");
-            } else if (data.step === "complete" && data.plan) {
-              clearTimeout(timeoutId);
-              setSteps((prev) => prev.map((s) => ({ ...s, status: "complete" })));
-              setCurrentMessage(MSG_MAP.complete);
-              setMasterPlan(data.plan as Parameters<typeof setMasterPlan>[0]);
-              setIsOnboarded(true);
-              setTimeout(() => router.push("/dashboard"), 1500);
-            }
-          }
-        }
+        setSteps((prev) => prev.map((s) => ({ ...s, status: "complete" })));
+        setCurrentMessage(MSG_MAP.complete);
+        setMasterPlan(masterPlan);
+        setIsOnboarded(true);
+        setTimeout(() => router.push("/dashboard"), 1500);
       } catch (err) {
-        if ((err as Error).name === "AbortError") return; // timeout already handled above
+        if ((err as Error).name === "AbortError") return;
+        clearTimeout(timeoutId);
         console.error("[generating] Fatal error:", err);
         setHasError(true);
         setErrorMessage(err instanceof Error ? err.message : "Something went wrong");
         setSteps((prev) =>
           prev.map((s) => (s.status === "active" ? { ...s, status: "error" } : s))
         );
-      } finally {
-        clearTimeout(timeoutId);
       }
     };
 
@@ -260,7 +260,7 @@ export default function GeneratingPage() {
 
         {!hasError && (
           <p style={{ textAlign: "center", color: "#333", fontSize: "0.72rem", marginTop: "2rem", marginBottom: 0 }}>
-            Running analyses in parallel to build your complete system. Please keep this tab open.
+            3 phases: diagnosis → strategy → everything else in parallel. Keep this tab open.
           </p>
         )}
       </div>
