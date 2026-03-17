@@ -25,12 +25,14 @@ Urgency: ${plan.diagnosis.urgencyLevel}`;
 
 export async function POST(request: NextRequest) {
   try {
-    const { messages, profile, plan, habitsSummary }: {
+    const body = await request.json() as {
       messages: Message[];
       profile: StudentProfile;
       plan: MasterPlan;
       habitsSummary?: string;
-    } = await request.json();
+    };
+
+    const { messages, profile, plan, habitsSummary } = body;
 
     if (!messages || !profile || !plan) {
       return NextResponse.json(
@@ -51,7 +53,6 @@ export async function POST(request: NextRequest) {
       systemInstruction: systemPrompt,
     });
 
-    // Build chat history from all messages except the last one
     const history = messages.slice(0, -1).map((m) => ({
       role: m.role === "user" ? "user" as const : "model" as const,
       parts: [{ text: m.content }],
@@ -59,14 +60,12 @@ export async function POST(request: NextRequest) {
 
     const chat = model.startChat({ history });
     const lastMessage = messages[messages.length - 1];
-
     const encoder = new TextEncoder();
 
     const readable = new ReadableStream({
       async start(controller) {
         try {
           const result = await chat.sendMessageStream(lastMessage.content);
-
           for await (const chunk of result.stream) {
             const text = chunk.text();
             if (text) {
@@ -75,7 +74,6 @@ export async function POST(request: NextRequest) {
               );
             }
           }
-
           controller.enqueue(encoder.encode(`data: [DONE]\n\n`));
         } catch (error) {
           controller.enqueue(

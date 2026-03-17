@@ -16,24 +16,28 @@ export default function CoachPage() {
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState("");
   const [isStreaming, setIsStreaming] = useState(false);
+  const [initialized, setInitialized] = useState(false);
   const bottomRef = useRef<HTMLDivElement>(null);
-  const inputRef = useRef<HTMLTextAreaElement>(null);
 
   useEffect(() => {
-    if (!isOnboarded || !studentProfile) { router.push("/onboarding"); return; }
-    if (!masterPlan) { router.push("/generating"); return; }
-
-    // Welcome message
-    if (messages.length === 0) {
-      const welcome: Message = {
+    if (!isOnboarded || !studentProfile) {
+      router.push("/onboarding");
+      return;
+    }
+    if (!masterPlan) {
+      router.push("/generating");
+      return;
+    }
+    if (!initialized) {
+      setInitialized(true);
+      setMessages([{
         id: "welcome",
         role: "assistant",
-        content: `Hey ${studentProfile.name.split(" ")[0]} 👋 I'm your personal coach. I know your full plan, your habits, your goals — everything. What's on your mind today?`,
+        content: `Hey ${studentProfile.name.split(" ")[0]} 👋 I'm your personal coach. I know your full plan, your habits, and your goals. What's on your mind today?`,
         timestamp: new Date().toISOString(),
-      };
-      setMessages([welcome]);
+      }]);
     }
-  }, [isOnboarded, studentProfile, masterPlan, router, messages.length]);
+  }, [isOnboarded, studentProfile, masterPlan, router, initialized]);
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -42,9 +46,9 @@ export default function CoachPage() {
   const getHabitsSummary = () => {
     if (!masterPlan) return "";
     const today = new Date().toISOString().split("T")[0];
-    const dailyHabits = masterPlan.habitSystem.filter((h) => h.frequency === "daily");
-    const completed = dailyHabits.filter((h) => habitCompletions[`${h.id}_${today}`]);
-    return `${completed.length}/${dailyHabits.length} habits done today`;
+    const daily = masterPlan.habitSystem.filter((h) => h.frequency === "daily");
+    const done = daily.filter((h) => habitCompletions[`${h.id}_${today}`]);
+    return `${done.length}/${daily.length} habits completed today`;
   };
 
   const sendMessage = async () => {
@@ -58,8 +62,8 @@ export default function CoachPage() {
       timestamp: new Date().toISOString(),
     };
 
-    const newMessages = [...messages, userMsg];
-    setMessages(newMessages);
+    const updated = [...messages, userMsg];
+    setMessages(updated);
     setInput("");
     setIsStreaming(true);
 
@@ -69,14 +73,14 @@ export default function CoachPage() {
       content: "",
       timestamp: new Date().toISOString(),
     };
-    setMessages([...newMessages, assistantMsg]);
+    setMessages([...updated, assistantMsg]);
 
     try {
       const res = await fetch("/api/coach", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          messages: newMessages,
+          messages: updated,
           profile: studentProfile,
           plan: masterPlan,
           habitsSummary: getHabitsSummary(),
@@ -84,6 +88,7 @@ export default function CoachPage() {
       });
 
       if (!res.body) throw new Error("No response body");
+
       const reader = res.body.getReader();
       const decoder = new TextDecoder();
       let buffer = "";
@@ -105,9 +110,9 @@ export default function CoachPage() {
             if (data.text) {
               fullText += data.text;
               setMessages((prev) => {
-                const updated = [...prev];
-                updated[updated.length - 1] = { ...updated[updated.length - 1], content: fullText };
-                return updated;
+                const copy = [...prev];
+                copy[copy.length - 1] = { ...copy[copy.length - 1], content: fullText };
+                return copy;
               });
             }
           } catch { /* skip */ }
@@ -115,9 +120,9 @@ export default function CoachPage() {
       }
     } catch {
       setMessages((prev) => {
-        const updated = [...prev];
-        updated[updated.length - 1] = { ...updated[updated.length - 1], content: "Sorry, something went wrong. Try again." };
-        return updated;
+        const copy = [...prev];
+        copy[copy.length - 1] = { ...copy[copy.length - 1], content: "Something went wrong. Please try again." };
+        return copy;
       });
     } finally {
       setIsStreaming(false);
@@ -134,8 +139,8 @@ export default function CoachPage() {
   const suggestions = [
     "How should I study today?",
     "I'm feeling unmotivated",
-    "Review my weak subjects",
     "Help me beat procrastination",
+    "Review my weak subjects",
   ];
 
   if (!masterPlan || !studentProfile) return null;
@@ -155,10 +160,16 @@ export default function CoachPage() {
           WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent",
         }}>PeakMind</span>
         <div style={{ display: "flex", gap: "0.5rem" }}>
-          {[{ label: "Dashboard", path: "/dashboard" }, { label: "Plan", path: "/plan" }, { label: "Schedule", path: "/schedule" }, { label: "Progress", path: "/progress" }].map((item) => (
+          {[
+            { label: "Dashboard", path: "/dashboard" },
+            { label: "Plan", path: "/plan" },
+            { label: "Schedule", path: "/schedule" },
+            { label: "Progress", path: "/progress" },
+          ].map((item) => (
             <button key={item.path} type="button" onClick={() => router.push(item.path)} style={{
-              padding: "0.4rem 0.9rem", background: "transparent", border: "1px solid #2a2a2a",
-              borderRadius: "8px", color: "#888", fontSize: "0.8rem", cursor: "pointer",
+              padding: "0.4rem 0.9rem", background: "transparent",
+              border: "1px solid #2a2a2a", borderRadius: "8px",
+              color: "#888", fontSize: "0.8rem", cursor: "pointer",
             }}
               onMouseEnter={(e) => { (e.currentTarget).style.borderColor = "#7c3aed"; (e.currentTarget).style.color = "#a78bfa"; }}
               onMouseLeave={(e) => { (e.currentTarget).style.borderColor = "#2a2a2a"; (e.currentTarget).style.color = "#888"; }}
@@ -167,22 +178,26 @@ export default function CoachPage() {
         </div>
       </div>
 
-      {/* Chat area */}
-      <div style={{ flex: 1, maxWidth: "760px", width: "100%", margin: "0 auto", padding: "2rem 1.5rem", display: "flex", flexDirection: "column", gap: "1rem" }}>
+      {/* Main */}
+      <div style={{
+        flex: 1, maxWidth: "760px", width: "100%", margin: "0 auto",
+        padding: "2rem 1.5rem 6rem", display: "flex", flexDirection: "column", gap: "1rem",
+      }}>
 
         {/* Header */}
-        <div style={{ marginBottom: "1rem" }}>
-          <h1 style={{ fontFamily: "'Playfair Display', serif", fontSize: "1.6rem", fontWeight: 700, color: "#fff", margin: "0 0 0.25rem" }}>
-            Your Coach
-          </h1>
+        <div style={{ marginBottom: "0.5rem" }}>
+          <h1 style={{
+            fontFamily: "'Playfair Display', serif", fontSize: "1.6rem",
+            fontWeight: 700, color: "#fff", margin: "0 0 0.25rem",
+          }}>Your Coach</h1>
           <p style={{ color: "#555", fontSize: "0.82rem", margin: 0 }}>
-            Knows your full plan · {masterPlan.diagnosis.urgencyLevel} urgency · {studentProfile.coachPersonality} style
+            {studentProfile.coachPersonality} style · {masterPlan.diagnosis.urgencyLevel} urgency
           </p>
         </div>
 
         {/* Messages */}
-        <div style={{ display: "flex", flexDirection: "column", gap: "1rem", flex: 1 }}>
-          {messages.map((msg) => (
+        <div style={{ display: "flex", flexDirection: "column", gap: "1rem" }}>
+          {messages.map((msg, i) => (
             <div key={msg.id} style={{
               display: "flex",
               justifyContent: msg.role === "user" ? "flex-end" : "flex-start",
@@ -191,18 +206,19 @@ export default function CoachPage() {
                 maxWidth: "75%",
                 padding: "0.85rem 1.1rem",
                 borderRadius: msg.role === "user" ? "16px 16px 4px 16px" : "16px 16px 16px 4px",
-                background: msg.role === "user"
-                  ? "linear-gradient(135deg,#7c3aed,#6d28d9)"
-                  : "#141414",
+                background: msg.role === "user" ? "linear-gradient(135deg,#7c3aed,#6d28d9)" : "#141414",
                 border: msg.role === "user" ? "none" : "1px solid #1e1e1e",
-                color: "#fff",
-                fontSize: "0.9rem",
-                lineHeight: 1.6,
-                whiteSpace: "pre-wrap",
+                color: "#fff", fontSize: "0.9rem", lineHeight: 1.6, whiteSpace: "pre-wrap",
               }}>
-                {msg.content}
-                {msg.role === "assistant" && isStreaming && msg.content === messages[messages.length - 1].content && (
-                  <span style={{ display: "inline-block", width: "2px", height: "1em", background: "#a78bfa", marginLeft: "2px", animation: "blink 1s infinite" }} />
+                {msg.content || (isStreaming && i === messages.length - 1 ? (
+                  <span style={{ color: "#555" }}>Thinking…</span>
+                ) : "")}
+                {isStreaming && i === messages.length - 1 && msg.content && (
+                  <span style={{
+                    display: "inline-block", width: "2px", height: "1em",
+                    background: "#a78bfa", marginLeft: "2px",
+                    animation: "blink 1s infinite",
+                  }} />
                 )}
               </div>
             </div>
@@ -215,9 +231,9 @@ export default function CoachPage() {
           <div style={{ display: "flex", flexWrap: "wrap", gap: "0.5rem", marginTop: "0.5rem" }}>
             {suggestions.map((s) => (
               <button key={s} type="button" onClick={() => setInput(s)} style={{
-                padding: "0.4rem 0.9rem", background: "#141414", border: "1px solid #2a2a2a",
-                borderRadius: "999px", color: "#888", fontSize: "0.8rem", cursor: "pointer",
-                transition: "all 0.15s",
+                padding: "0.4rem 0.9rem", background: "#141414",
+                border: "1px solid #2a2a2a", borderRadius: "999px",
+                color: "#888", fontSize: "0.8rem", cursor: "pointer", transition: "all 0.15s",
               }}
                 onMouseEnter={(e) => { (e.currentTarget).style.borderColor = "#7c3aed"; (e.currentTarget).style.color = "#a78bfa"; }}
                 onMouseLeave={(e) => { (e.currentTarget).style.borderColor = "#2a2a2a"; (e.currentTarget).style.color = "#888"; }}
@@ -225,24 +241,30 @@ export default function CoachPage() {
             ))}
           </div>
         )}
+      </div>
 
-        {/* Input */}
+      {/* Input bar - fixed at bottom */}
+      <div style={{
+        position: "fixed", bottom: 0, left: 0, right: 0,
+        background: "rgba(10,10,10,0.95)", borderTop: "1px solid #1a1a1a",
+        padding: "1rem", backdropFilter: "blur(12px)",
+      }}>
         <div style={{
+          maxWidth: "760px", margin: "0 auto",
           display: "flex", gap: "0.75rem", alignItems: "flex-end",
-          background: "#111", border: "1px solid #1e1e1e", borderRadius: "14px", padding: "0.75rem",
-          position: "sticky", bottom: "1rem",
+          background: "#111", border: "1px solid #1e1e1e",
+          borderRadius: "14px", padding: "0.75rem",
         }}>
           <textarea
-            ref={inputRef}
             value={input}
             onChange={(e) => setInput(e.target.value)}
             onKeyDown={handleKeyDown}
-            placeholder="Ask your coach anything..."
+            placeholder="Ask your coach anything... (Enter to send)"
             rows={1}
             style={{
               flex: 1, background: "none", border: "none", outline: "none",
-              color: "#fff", fontSize: "0.9rem", resize: "none", fontFamily: "inherit",
-              lineHeight: 1.5, maxHeight: "120px",
+              color: "#fff", fontSize: "0.9rem", resize: "none",
+              fontFamily: "inherit", lineHeight: 1.5, maxHeight: "120px",
             }}
           />
           <button
@@ -250,11 +272,14 @@ export default function CoachPage() {
             onClick={sendMessage}
             disabled={isStreaming || !input.trim()}
             style={{
-              width: "36px", height: "36px", borderRadius: "10px", flexShrink: 0,
-              background: isStreaming || !input.trim() ? "#1e1e1e" : "linear-gradient(135deg,#7c3aed,#a78bfa)",
-              border: "none", cursor: isStreaming || !input.trim() ? "not-allowed" : "pointer",
+              width: "38px", height: "38px", borderRadius: "10px", flexShrink: 0,
+              background: isStreaming || !input.trim()
+                ? "#1e1e1e"
+                : "linear-gradient(135deg,#7c3aed,#a78bfa)",
+              border: "none",
+              cursor: isStreaming || !input.trim() ? "not-allowed" : "pointer",
               display: "flex", alignItems: "center", justifyContent: "center",
-              color: "#fff", fontSize: "1rem", transition: "all 0.15s",
+              color: "#fff", fontSize: "1.1rem", transition: "all 0.15s",
             }}
           >→</button>
         </div>
