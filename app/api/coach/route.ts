@@ -52,7 +52,7 @@ export async function POST(request: NextRequest) {
 
     // No systemInstruction param — inject system context as the first turn in history
     // This ensures compatibility across all SDK versions
-    const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
+    const model = genAI.getGenerativeModel({ model: "gemini-2.0-flash" });
 
     const userHistory = messages.slice(0, -1).map((m) => ({
       role: m.role === "user" ? "user" as const : "model" as const,

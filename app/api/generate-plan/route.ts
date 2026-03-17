@@ -55,7 +55,7 @@ function withTimeout<T>(promise: Promise<T>, ms: number, label: string): Promise
 async function callGemini(prompt: string, stepLabel: string): Promise<unknown> {
   console.log(`[generate-plan] ▶ START ${stepLabel}`);
 
-  const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
+  const model = genAI.getGenerativeModel({ model: "gemini-2.0-flash" });
 
   // Prepend system context directly into the prompt
   const fullPrompt = `${JSON_SYSTEM_PROMPT}\n\n${prompt}`;
