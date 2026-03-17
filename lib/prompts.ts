@@ -61,15 +61,14 @@ Return ONLY this JSON:
 }`;
 }
 
-export function buildSchedulePrompt(profile: StudentProfile, strategy: Strategy): string {
-  return `Create a daily routine and weekly study schedule for this student.
+export function buildDailyRoutinePrompt(profile: StudentProfile, strategy: Strategy): string {
+  return `Create a daily routine for this student.
 
 Wake: ${profile.wakeUpTime}, Sleep: ${profile.sleepTime}
 Energy peak: ${profile.energyPeakTime}
 Exercise: ${profile.exerciseFrequency}
 Daily hours: ${profile.dailyStudyHoursAvailable}
 Session length: ${strategy.sessionLength} min, Break: ${strategy.breakDuration} min
-Subjects: ${strategy.subjects.map((s) => `${s.subject}: ${s.priority}, ${s.weeklyHours}h/week`).join(", ")}
 
 Return ONLY this JSON:
 {
@@ -82,7 +81,22 @@ Return ONLY this JSON:
       "isFlexible": false,
       "notes": "optional tip"
     }
-  ],
+  ]
+}
+Include 8-12 blocks covering the full waking day. Schedule deep work at energy peak time.`;
+}
+
+export function buildWeeklySchedulePrompt(profile: StudentProfile, strategy: Strategy): string {
+  return `Create a 7-day weekly study schedule for this student.
+
+Wake: ${profile.wakeUpTime}, Sleep: ${profile.sleepTime}
+Energy peak: ${profile.energyPeakTime}
+Daily hours: ${profile.dailyStudyHoursAvailable}
+Session length: ${strategy.sessionLength} min, Break: ${strategy.breakDuration} min
+Subjects: ${strategy.subjects.map((s) => `${s.subject}: ${s.priority}, ${s.weeklyHours}h/week`).join(", ")}
+
+Return ONLY this JSON:
+{
   "weeklySchedule": [
     {
       "day": "Monday",
@@ -100,7 +114,7 @@ Return ONLY this JSON:
     }
   ]
 }
-Include all 7 days. At least 1 rest day. Schedule deep work at energy peak time.`;
+Include all 7 days (Monday through Sunday). At least 1 full rest day with isRestDay: true and empty blocks array. Schedule deep work at energy peak time.`;
 }
 
 export function buildSystemsPrompt(

@@ -5,7 +5,8 @@ import {
   JSON_SYSTEM_PROMPT,
   buildDiagnosisPrompt,
   buildStrategyPrompt,
-  buildSchedulePrompt,
+  buildDailyRoutinePrompt,
+  buildWeeklySchedulePrompt,
   buildSystemsPrompt,
   buildResourcesPrompt,
   buildWeeklyReviewPrompt,
@@ -118,12 +119,19 @@ export async function POST(request: NextRequest) {
             throw new Error(`Strategy step failed: ${msg}`);
           }
 
-          // ── Step 3: Schedule ───────────────────────────────────────────────
+          // ── Step 3: Schedule (daily routine + weekly schedule in parallel) ─
           send({ step: "schedule", status: "active" });
           let schedule: { dailyRoutine: MasterPlan["dailyRoutine"]; weeklySchedule: MasterPlan["weeklySchedule"] };
           try {
-            console.log("[generate-plan] Step 3/6 — schedule");
-            schedule = await callGemini(buildSchedulePrompt(profile, strategy), "schedule") as typeof schedule;
+            console.log("[generate-plan] Step 3/6 — schedule (parallel)");
+            const [routineResult, weeklyResult] = await Promise.all([
+              callGemini(buildDailyRoutinePrompt(profile, strategy), "dailyRoutine") as Promise<{ dailyRoutine: MasterPlan["dailyRoutine"] }>,
+              callGemini(buildWeeklySchedulePrompt(profile, strategy), "weeklySchedule") as Promise<{ weeklySchedule: MasterPlan["weeklySchedule"] }>,
+            ]);
+            schedule = {
+              dailyRoutine: (routineResult as { dailyRoutine: MasterPlan["dailyRoutine"] }).dailyRoutine,
+              weeklySchedule: (weeklyResult as { weeklySchedule: MasterPlan["weeklySchedule"] }).weeklySchedule,
+            };
             send({ step: "schedule", status: "complete" });
             console.log("[generate-plan] ✓ Step 3/6 schedule complete");
           } catch (err) {
