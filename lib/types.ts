@@ -1,4 +1,4 @@
-  export type EducationLevel =
+export type EducationLevel =
   | "high_school"
   | "undergraduate"
   | "postgraduate"

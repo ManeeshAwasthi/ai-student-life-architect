@@ -48,9 +48,8 @@ export default function CoachPage() {
 
   const getHabitsSummary = () => {
     if (!masterPlan) return "";
-    const today = new Date().toISOString().split("T")[0];
     const daily = masterPlan.habitSystem.filter((h) => h.frequency === "daily");
-    const done = daily.filter((h) => habitCompletions[`${h.id}_${today}`]);
+    const done = daily.filter((h) => habitCompletions[h.id]);
     return `${done.length}/${daily.length} habits completed today`;
   };
 

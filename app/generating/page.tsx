@@ -20,6 +20,16 @@ const STEPS: Step[] = [
   { id: "review", label: "Setting up weekly reviews", sublabel: "Building your progress tracking system", status: "pending" },
 ];
 
+const MSG_MAP: Record<string, string> = {
+  diagnosis: "Analysing your study patterns and psychology…",
+  strategy: "Designing your personalised study strategy…",
+  schedule: "Building your daily and weekly schedule…",
+  systems: "Creating your habit and distraction systems…",
+  resources: "Curating books, tools and techniques…",
+  review: "Setting up your weekly review system…",
+  complete: "Your system is ready!",
+};
+
 export default function GeneratingPage() {
   const router = useRouter();
   const store = useAppStore();
@@ -49,16 +59,6 @@ export default function GeneratingPage() {
 
   const updateStep = (id: string, status: Step["status"]) => {
     setSteps((prev) => prev.map((s) => (s.id === id ? { ...s, status } : s)));
-  };
-
-  const msgMap: Record<string, string> = {
-    diagnosis: "Analysing your study patterns and psychology…",
-    strategy: "Designing your personalised study strategy…",
-    schedule: "Building your daily and weekly schedule…",
-    systems: "Creating your habit and distraction systems…",
-    resources: "Curating books, tools and techniques…",
-    review: "Setting up your weekly review system…",
-    complete: "Your system is ready!",
   };
 
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -95,12 +95,12 @@ export default function GeneratingPage() {
               const data = JSON.parse(raw);
               if (data.status === "active") {
                 updateStep(data.step, "active");
-                setCurrentMessage(msgMap[data.step] ?? "Working…");
+                setCurrentMessage(MSG_MAP[data.step] ?? "Working…");
               } else if (data.status === "complete" && data.step !== "complete") {
                 updateStep(data.step, "complete");
               } else if (data.step === "complete" && data.plan) {
                 setSteps((prev) => prev.map((s) => ({ ...s, status: "complete" })));
-                setCurrentMessage(msgMap.complete);
+                setCurrentMessage(MSG_MAP.complete);
                 setMasterPlan(data.plan);
                 setIsOnboarded(true);
                 setTimeout(() => router.push("/dashboard"), 1500);

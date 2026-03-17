@@ -9,10 +9,6 @@ function getTodayName() {
   return new Date().toLocaleDateString("en-US", { weekday: "long" });
 }
 
-function getTodayString() {
-  return new Date().toISOString().split("T")[0];
-}
-
 function getGreeting() {
   const h = new Date().getHours();
   if (h < 12) return "Good morning";
@@ -55,13 +51,12 @@ export default function DashboardPage() {
 
   if (!masterPlan || !studentProfile) return null;
 
-  const today = getTodayString();
   const todayName = getTodayName();
   const todayDay = masterPlan.weeklySchedule.find((d) => d.day === todayName);
   const isRestDay = todayDay?.isRestDay ?? false;
   const todaySchedule = todayDay?.blocks ?? [];
 
-  const completedHabits = todayHabits.filter((h) => habitCompletions[`${h.id}_${today}`]).length;
+  const completedHabits = todayHabits.filter((h) => habitCompletions[h.id]).length;
   const habitPercent = todayHabits.length > 0 ? Math.round((completedHabits / todayHabits.length) * 100) : 0;
 
   const urgencyColors: Record<string, string> = {
@@ -219,7 +214,7 @@ export default function DashboardPage() {
 
             <div style={{ display: "flex", flexDirection: "column", gap: "0.5rem" }}>
               {todayHabits.map((habit) => {
-                const done = !!habitCompletions[`${habit.id}_${today}`];
+                const done = !!habitCompletions[habit.id];
                 return (
                   <div key={habit.id} onClick={() => toggleHabit(habit.id)} style={{
                     display: "flex", alignItems: "center", gap: "0.75rem",

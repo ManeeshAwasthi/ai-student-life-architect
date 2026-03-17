@@ -1,4 +1,4 @@
- import type { StudentProfile, Diagnosis, Strategy } from "./types";
+import type { StudentProfile, Diagnosis, Strategy } from "./types";
 
 export const JSON_SYSTEM_PROMPT = `You are an expert AI productivity coach and educational psychologist.
 You MUST respond with ONLY valid JSON. No explanations, no markdown, no code fences.
