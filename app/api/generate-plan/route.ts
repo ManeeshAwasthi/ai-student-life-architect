@@ -49,18 +49,18 @@ function withTimeout<T>(promise: Promise<T>, ms: number, label: string): Promise
   return Promise.race([promise, timeout]);
 }
 
-// Gemini call: system prompt is prepended to the user message (no systemInstruction param)
-// so this works with any SDK version
+// Gemini call: uses responseMimeType "application/json" to guarantee valid JSON output
 async function callGemini(prompt: string, stepLabel: string): Promise<unknown> {
   console.log(`[generate-plan] ▶ START ${stepLabel}`);
 
   const model = getGeminiModel();
 
-  // Prepend system context directly into the prompt
-  const fullPrompt = `${JSON_SYSTEM_PROMPT}\n\n${prompt}`;
-
   const result = await withTimeout(
-    model.generateContent(fullPrompt),
+    model.generateContent({
+      contents: [{ role: "user", parts: [{ text: prompt }] }],
+      systemInstruction: JSON_SYSTEM_PROMPT,
+      generationConfig: { responseMimeType: "application/json" },
+    }),
     55_000,
     stepLabel
   );
