@@ -1,9 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
-import { GoogleGenerativeAI } from "@google/generative-ai";
 import type { Message, StudentProfile, MasterPlan } from "@/lib/types";
 import { buildCoachSystemPrompt } from "@/lib/prompts";
-
-const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY ?? "");
+import { getGeminiModel } from "@/lib/generative-ai";
 
 function buildPlanSummary(plan: MasterPlan): string {
   const subjects = plan.strategy.subjects
@@ -52,7 +50,7 @@ export async function POST(request: NextRequest) {
 
     // No systemInstruction param — inject system context as the first turn in history
     // This ensures compatibility across all SDK versions
-    const model = genAI.getGenerativeModel({ model: "gemini-2.0-flash" });
+    const model = getGeminiModel();
 
     const userHistory = messages.slice(0, -1).map((m) => ({
       role: m.role === "user" ? "user" as const : "model" as const,

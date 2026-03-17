@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { GoogleGenerativeAI } from "@google/generative-ai";
+import { getGeminiModel } from "@/lib/generative-ai";
 import type { StudentProfile, MasterPlan, Diagnosis, Strategy } from "@/lib/types";
 import {
   JSON_SYSTEM_PROMPT,
@@ -10,8 +10,6 @@ import {
   buildResourcesPrompt,
   buildWeeklyReviewPrompt,
 } from "@/lib/prompts";
-
-const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY ?? "");
 
 // Aggressive JSON extraction: strip fences, then cut to first { ... last }
 function safeParseJSON(text: string): unknown {
@@ -55,7 +53,7 @@ function withTimeout<T>(promise: Promise<T>, ms: number, label: string): Promise
 async function callGemini(prompt: string, stepLabel: string): Promise<unknown> {
   console.log(`[generate-plan] ▶ START ${stepLabel}`);
 
-  const model = genAI.getGenerativeModel({ model: "gemini-2.0-flash" });
+  const model = getGeminiModel();
 
   // Prepend system context directly into the prompt
   const fullPrompt = `${JSON_SYSTEM_PROMPT}\n\n${prompt}`;
