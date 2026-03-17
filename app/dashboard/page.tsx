@@ -1,7 +1,7 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
+import { useEffect, useState, useRef } from "react";
+import { useRouter, usePathname } from "next/navigation";
 import { useAppStore } from "@/lib/store";
 import type { Habit, StudentProfile, MasterPlan } from "@/lib/types";
 
@@ -216,16 +216,12 @@ const MOCK_PLAN: MasterPlan = {
 };
 // ──────────────────────────────────────────────────────────────────────────────
 
-function getTodayName() {
-  return new Date().toLocaleDateString("en-US", { weekday: "long" });
-}
-
-function getGreeting() {
+function getGreetingData() {
   const h = new Date().getHours();
-  if (h < 12) return "Good morning";
-  if (h < 17) return "Good afternoon";
-  if (h < 21) return "Good evening";
-  return "Good night";
+  if (h >= 5 && h < 12) return { text: "Good morning", icon: "🌅" };
+  if (h >= 12 && h < 17) return { text: "Good afternoon", icon: "☀️" };
+  if (h >= 17 && h < 21) return { text: "Good evening", icon: "🌆" };
+  return { text: "Good night", icon: "🌙" };
 }
 
 function formatDate() {
@@ -234,8 +230,34 @@ function formatDate() {
   });
 }
 
+function useCountUp(target: number, duration = 1200) {
+  const [count, setCount] = useState(0);
+  const startTime = useRef<number | null>(null);
+  useEffect(() => {
+    if (target === 0) { setCount(0); return; }
+    startTime.current = null;
+    const step = (ts: number) => {
+      if (!startTime.current) startTime.current = ts;
+      const progress = Math.min((ts - startTime.current) / duration, 1);
+      setCount(Math.floor(progress * target));
+      if (progress < 1) requestAnimationFrame(step);
+    };
+    requestAnimationFrame(step);
+  }, [target, duration]);
+  return count;
+}
+
+const subjectColors: Record<string, { bg: string; accent: string }> = {
+  Mathematics: { bg: "rgba(139,92,246,0.15)", accent: "#8b5cf6" },
+  Physics: { bg: "rgba(59,130,246,0.15)", accent: "#3b82f6" },
+  Chemistry: { bg: "rgba(16,185,129,0.15)", accent: "#10b981" },
+  Revision: { bg: "rgba(245,158,11,0.15)", accent: "#f59e0b" },
+  default: { bg: "rgba(124,58,237,0.12)", accent: "#7c3aed" },
+};
+
 export default function DashboardPage() {
   const router = useRouter();
+  const pathname = usePathname();
   const store = useAppStore();
 
   const studentProfile = store.studentProfile;
@@ -247,6 +269,13 @@ export default function DashboardPage() {
   const toggleHabit = store.toggleHabit;
 
   const [todayHabits, setTodayHabits] = useState<Habit[]>([]);
+  const [greeting, setGreeting] = useState({ text: "Welcome", icon: "👋" });
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    setGreeting(getGreetingData());
+    setMounted(true);
+  }, []);
 
   useEffect(() => {
     if (!masterPlan || !studentProfile || !isOnboarded) return;
@@ -259,12 +288,11 @@ export default function DashboardPage() {
     store.setIsOnboarded(true);
   }
 
+  const streakCount = useCountUp(currentStreak, 800);
+
   if (!masterPlan || !studentProfile) {
     return (
-      <div style={{
-        minHeight: "100vh", background: "#0a0a0a",
-        display: "flex", alignItems: "center", justifyContent: "center",
-      }}>
+      <div style={{ minHeight: "100vh", background: "#050508", display: "flex", alignItems: "center", justifyContent: "center" }}>
         <button type="button" onClick={loadTestData} style={{
           padding: "0.5rem 1rem", fontSize: "0.75rem", color: "#aaa",
           background: "#161616", border: "1px solid #333", borderRadius: "8px",
@@ -276,7 +304,7 @@ export default function DashboardPage() {
     );
   }
 
-  const todayName = getTodayName();
+  const todayName = new Date().toLocaleDateString("en-US", { weekday: "long" });
   const todayDay = masterPlan.weeklySchedule.find((d) => d.day === todayName);
   const isRestDay = todayDay?.isRestDay ?? false;
   const todaySchedule = todayDay?.blocks ?? [];
@@ -287,251 +315,638 @@ export default function DashboardPage() {
   const urgencyColors: Record<string, string> = {
     low: "#4ade80", medium: "#facc15", high: "#fb923c", critical: "#f87171",
   };
-
-  const card: React.CSSProperties = {
-    background: "#111111", border: "1px solid #1e1e1e", borderRadius: "16px", padding: "1.5rem",
+  const urgencyGlow: Record<string, string> = {
+    low: "rgba(74,222,128,0.15)", medium: "rgba(250,204,21,0.15)",
+    high: "rgba(251,146,60,0.15)", critical: "rgba(248,113,113,0.15)",
   };
 
+  const navItems = [
+    { label: "Plan", path: "/plan", icon: "📋" },
+    { label: "Schedule", path: "/schedule", icon: "📅" },
+    { label: "Coach", path: "/coach", icon: "💬" },
+    { label: "Progress", path: "/progress", icon: "📈" },
+  ];
+
   return (
-    <div style={{ minHeight: "100vh", background: "#0a0a0a", fontFamily: "'Inter', sans-serif", paddingBottom: "4rem" }}>
+    <>
+      <style>{`
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=Playfair+Display:wght@700;900&display=swap');
 
-      {/* Navbar */}
+        * { box-sizing: border-box; }
+
+        @keyframes fadeInUp {
+          from { opacity: 0; transform: translateY(20px); }
+          to { opacity: 1; transform: translateY(0); }
+        }
+        @keyframes fadeIn {
+          from { opacity: 0; }
+          to { opacity: 1; }
+        }
+        @keyframes slideDown {
+          from { opacity: 0; transform: translateY(-12px); }
+          to { opacity: 1; transform: translateY(0); }
+        }
+        @keyframes pulse-glow {
+          0%, 100% { box-shadow: 0 0 0 0 rgba(167,139,250,0); }
+          50% { box-shadow: 0 0 16px 4px rgba(167,139,250,0.18); }
+        }
+        @keyframes orb1 {
+          0%, 100% { transform: translate(0, 0) scale(1); }
+          33% { transform: translate(60px, -40px) scale(1.1); }
+          66% { transform: translate(-30px, 50px) scale(0.95); }
+        }
+        @keyframes orb2 {
+          0%, 100% { transform: translate(0, 0) scale(1); }
+          33% { transform: translate(-50px, 60px) scale(1.05); }
+          66% { transform: translate(40px, -30px) scale(1.12); }
+        }
+        @keyframes shimmer {
+          0% { background-position: -200% center; }
+          100% { background-position: 200% center; }
+        }
+        @keyframes streak-pulse {
+          0%, 100% { transform: scale(1); }
+          50% { transform: scale(1.08); }
+        }
+        @keyframes progress-fill {
+          from { width: 0%; }
+        }
+        @keyframes check-pop {
+          0% { transform: scale(0); }
+          60% { transform: scale(1.2); }
+          100% { transform: scale(1); }
+        }
+
+        .pm-nav-btn {
+          padding: 0.45rem 1rem;
+          background: rgba(255,255,255,0.04);
+          border: 1px solid rgba(255,255,255,0.08);
+          border-radius: 10px;
+          color: #888;
+          font-size: 0.8rem;
+          font-weight: 500;
+          cursor: pointer;
+          transition: all 0.2s cubic-bezier(0.4,0,0.2,1);
+          font-family: 'Inter', sans-serif;
+          letter-spacing: 0.01em;
+          position: relative;
+          overflow: hidden;
+        }
+        .pm-nav-btn::before {
+          content: '';
+          position: absolute;
+          inset: 0;
+          background: linear-gradient(135deg, rgba(167,139,250,0.1), rgba(236,72,153,0.06));
+          opacity: 0;
+          transition: opacity 0.2s;
+        }
+        .pm-nav-btn:hover {
+          border-color: rgba(167,139,250,0.45);
+          color: #c4b5fd;
+          background: rgba(124,58,237,0.12);
+          box-shadow: 0 0 12px rgba(124,58,237,0.2), 0 2px 8px rgba(0,0,0,0.3);
+          transform: translateY(-1px);
+        }
+        .pm-nav-btn:hover::before { opacity: 1; }
+        .pm-nav-btn:active { transform: translateY(0px) scale(0.97); }
+        .pm-nav-btn.active {
+          border-color: rgba(167,139,250,0.5);
+          color: #c4b5fd;
+          background: rgba(124,58,237,0.15);
+          box-shadow: 0 0 14px rgba(124,58,237,0.22);
+        }
+        .pm-nav-btn.active::before { opacity: 1; }
+
+        .pm-stat-card {
+          background: rgba(255,255,255,0.03);
+          border: 1px solid rgba(255,255,255,0.07);
+          border-radius: 18px;
+          padding: 1.5rem;
+          text-align: center;
+          transition: all 0.3s cubic-bezier(0.4,0,0.2,1);
+          cursor: default;
+          position: relative;
+          overflow: hidden;
+          backdrop-filter: blur(8px);
+        }
+        .pm-stat-card::before {
+          content: '';
+          position: absolute;
+          inset: 0;
+          background: radial-gradient(circle at 50% 0%, rgba(167,139,250,0.06), transparent 70%);
+          pointer-events: none;
+        }
+        .pm-stat-card:hover {
+          border-color: rgba(167,139,250,0.25);
+          background: rgba(255,255,255,0.05);
+          transform: translateY(-3px);
+          box-shadow: 0 8px 32px rgba(0,0,0,0.4), 0 0 0 1px rgba(167,139,250,0.1);
+        }
+
+        .pm-glass-card {
+          background: rgba(255,255,255,0.025);
+          border: 1px solid rgba(255,255,255,0.07);
+          border-radius: 20px;
+          padding: 1.5rem;
+          transition: border-color 0.3s, box-shadow 0.3s;
+          backdrop-filter: blur(12px);
+        }
+        .pm-glass-card:hover {
+          border-color: rgba(167,139,250,0.18);
+          box-shadow: 0 4px 24px rgba(0,0,0,0.3);
+        }
+
+        .pm-schedule-block {
+          display: flex;
+          align-items: center;
+          gap: 0.75rem;
+          padding: 0.7rem 0.9rem;
+          background: rgba(255,255,255,0.03);
+          border-radius: 12px;
+          border: 1px solid rgba(255,255,255,0.06);
+          transition: all 0.2s;
+        }
+        .pm-schedule-block:hover {
+          background: rgba(255,255,255,0.06);
+          border-color: rgba(167,139,250,0.2);
+          transform: translateX(3px);
+        }
+
+        .pm-habit-row {
+          display: flex;
+          align-items: center;
+          gap: 0.75rem;
+          padding: 0.65rem 0.85rem;
+          border-radius: 12px;
+          border: 1px solid rgba(255,255,255,0.06);
+          cursor: pointer;
+          transition: all 0.2s cubic-bezier(0.4,0,0.2,1);
+          user-select: none;
+        }
+        .pm-habit-row:hover {
+          background: rgba(255,255,255,0.04) !important;
+          border-color: rgba(167,139,250,0.2) !important;
+          transform: translateX(2px);
+        }
+        .pm-habit-row:active { transform: scale(0.99); }
+
+        .pm-nav-card {
+          background: rgba(255,255,255,0.025);
+          border: 1px solid rgba(255,255,255,0.07);
+          border-radius: 16px;
+          padding: 1.25rem;
+          cursor: pointer;
+          transition: all 0.25s cubic-bezier(0.4,0,0.2,1);
+          position: relative;
+          overflow: hidden;
+        }
+        .pm-nav-card::after {
+          content: '';
+          position: absolute;
+          bottom: 0; left: 0; right: 0;
+          height: 2px;
+          background: linear-gradient(90deg, #7c3aed, #ec4899);
+          transform: scaleX(0);
+          transition: transform 0.3s;
+          transform-origin: left;
+        }
+        .pm-nav-card:hover {
+          border-color: rgba(167,139,250,0.3);
+          background: rgba(124,58,237,0.08);
+          transform: translateY(-4px);
+          box-shadow: 0 12px 32px rgba(0,0,0,0.4), 0 0 0 1px rgba(167,139,250,0.15);
+        }
+        .pm-nav-card:hover::after { transform: scaleX(1); }
+        .pm-nav-card:active { transform: translateY(-1px); }
+
+        .pm-insight-card {
+          background: rgba(255,255,255,0.025);
+          border-radius: 20px;
+          padding: 1.5rem;
+          transition: box-shadow 0.3s;
+          backdrop-filter: blur(12px);
+        }
+
+        .pm-streak-num {
+          animation: streak-pulse 2s ease-in-out infinite;
+          display: inline-block;
+        }
+
+        .stagger-1 { animation: fadeInUp 0.6s ease both; animation-delay: 0.05s; }
+        .stagger-2 { animation: fadeInUp 0.6s ease both; animation-delay: 0.12s; }
+        .stagger-3 { animation: fadeInUp 0.6s ease both; animation-delay: 0.19s; }
+        .stagger-4 { animation: fadeInUp 0.6s ease both; animation-delay: 0.26s; }
+        .stagger-5 { animation: fadeInUp 0.6s ease both; animation-delay: 0.33s; }
+        .stagger-6 { animation: fadeInUp 0.6s ease both; animation-delay: 0.40s; }
+        .stagger-7 { animation: fadeInUp 0.6s ease both; animation-delay: 0.47s; }
+
+        .nav-slide { animation: slideDown 0.4s ease both; }
+
+        .pm-progress-bar {
+          animation: progress-fill 1.2s ease both;
+          animation-delay: 0.5s;
+        }
+
+        .check-icon { animation: check-pop 0.25s cubic-bezier(0.34,1.56,0.64,1) both; }
+      `}</style>
+
       <div style={{
-        background: "rgba(10,10,10,0.9)", borderBottom: "1px solid #1a1a1a",
-        padding: "0.9rem 2rem", display: "flex", justifyContent: "space-between",
-        alignItems: "center", position: "sticky", top: 0, zIndex: 100, backdropFilter: "blur(12px)",
+        minHeight: "100vh",
+        background: "#050508",
+        fontFamily: "'Inter', sans-serif",
+        paddingBottom: "5rem",
+        position: "relative",
+        overflow: "hidden",
       }}>
-        <span style={{
-          fontFamily: "'Playfair Display', serif", fontSize: "1.1rem", fontWeight: 900,
-          background: "linear-gradient(135deg, #a78bfa, #ec4899)",
-          WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent",
-        }}>PeakMind</span>
-        <div style={{ display: "flex", gap: "0.5rem" }}>
-          {[
-            { label: "Plan", path: "/plan" },
-            { label: "Schedule", path: "/schedule" },
-            { label: "Coach", path: "/coach" },
-            { label: "Progress", path: "/progress" },
-          ].map((item) => (
-            <button key={item.path} type="button" onClick={() => router.push(item.path)} style={{
-              padding: "0.4rem 0.9rem", background: "transparent",
-              border: "1px solid #2a2a2a", borderRadius: "8px",
-              color: "#888", fontSize: "0.8rem", cursor: "pointer",
-            }}
-              onMouseEnter={(e) => { (e.currentTarget).style.borderColor = "#7c3aed"; (e.currentTarget).style.color = "#a78bfa"; }}
-              onMouseLeave={(e) => { (e.currentTarget).style.borderColor = "#2a2a2a"; (e.currentTarget).style.color = "#888"; }}
-            >{item.label}</button>
-          ))}
-        </div>
-      </div>
 
-      <div style={{ maxWidth: "900px", margin: "0 auto", padding: "2.5rem 1.5rem 0" }}>
-
-        {/* Header */}
-        <div style={{ marginBottom: "2.5rem" }}>
-          <p style={{ color: "#555", fontSize: "0.82rem", margin: "0 0 0.25rem" }}>{formatDate()}</p>
-          <h1 style={{
-            fontFamily: "'Playfair Display', serif",
-            fontSize: "clamp(1.6rem, 3vw, 2.2rem)",
-            fontWeight: 900, color: "#fff", margin: "0 0 0.5rem",
-          }}>
-            {getGreeting()}, {studentProfile.name.split(" ")[0]} 👋
-          </h1>
-          <p style={{ color: "#666", fontSize: "0.9rem", margin: 0 }}>
-            {isRestDay
-              ? "Today is a rest day. Recover well."
-              : `${todaySchedule.length} study blocks · ${todayHabits.length} habits to complete`}
-          </p>
+        {/* Animated background orbs */}
+        <div style={{ position: "fixed", inset: 0, pointerEvents: "none", zIndex: 0 }}>
+          <div style={{
+            position: "absolute", top: "10%", left: "15%",
+            width: "500px", height: "500px",
+            background: "radial-gradient(circle, rgba(124,58,237,0.08) 0%, transparent 70%)",
+            borderRadius: "50%",
+            animation: "orb1 18s ease-in-out infinite",
+          }} />
+          <div style={{
+            position: "absolute", top: "50%", right: "10%",
+            width: "400px", height: "400px",
+            background: "radial-gradient(circle, rgba(236,72,153,0.06) 0%, transparent 70%)",
+            borderRadius: "50%",
+            animation: "orb2 22s ease-in-out infinite",
+          }} />
+          <div style={{
+            position: "absolute", bottom: "15%", left: "40%",
+            width: "300px", height: "300px",
+            background: "radial-gradient(circle, rgba(59,130,246,0.05) 0%, transparent 70%)",
+            borderRadius: "50%",
+            animation: "orb1 26s ease-in-out infinite reverse",
+          }} />
         </div>
 
-        {/* Key insight banner */}
-        <div style={{
-          ...card, marginBottom: "1.5rem",
-          borderLeft: `3px solid ${urgencyColors[masterPlan.diagnosis.urgencyLevel]}`,
+        {/* Navbar */}
+        <div className="nav-slide" style={{
+          background: "rgba(5,5,8,0.85)",
+          borderBottom: "1px solid rgba(255,255,255,0.06)",
+          padding: "0.85rem 2rem",
+          display: "flex",
+          justifyContent: "space-between",
+          alignItems: "center",
+          position: "sticky",
+          top: 0,
+          zIndex: 100,
+          backdropFilter: "blur(20px)",
+          WebkitBackdropFilter: "blur(20px)",
         }}>
-          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: "1rem" }}>
-            <div>
-              <p style={{ color: "#555", fontSize: "0.72rem", margin: "0 0 0.4rem", textTransform: "uppercase", letterSpacing: "0.08em" }}>
-                Your Key Insight
-              </p>
-              <p style={{ color: "#e0e0e0", fontSize: "0.92rem", margin: 0, lineHeight: 1.6 }}>
-                {masterPlan.diagnosis.keyInsight}
-              </p>
-            </div>
-            <span style={{
-              flexShrink: 0, padding: "0.25rem 0.65rem", borderRadius: "999px",
-              fontSize: "0.7rem", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.06em",
-              background: `${urgencyColors[masterPlan.diagnosis.urgencyLevel]}18`,
-              color: urgencyColors[masterPlan.diagnosis.urgencyLevel],
-              border: `1px solid ${urgencyColors[masterPlan.diagnosis.urgencyLevel]}33`,
-            }}>
-              {masterPlan.diagnosis.urgencyLevel}
-            </span>
-          </div>
-        </div>
-
-        {/* Stats */}
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: "1rem", marginBottom: "1.5rem" }}>
-          {[
-            { label: "Study Streak", value: `${currentStreak}`, unit: "days", color: "#a78bfa", icon: "🔥" },
-            { label: "Hours Today", value: studyHoursToday.toFixed(1), unit: "hrs", color: "#60a5fa", icon: "⏱️" },
-            { label: "Habits Done", value: `${completedHabits}/${todayHabits.length}`, unit: `${habitPercent}%`, color: "#4ade80", icon: "✅" },
-          ].map((stat) => (
-            <div key={stat.label} style={{ ...card, textAlign: "center" }}>
-              <div style={{ fontSize: "1.4rem", marginBottom: "0.4rem" }}>{stat.icon}</div>
-              <div style={{ fontSize: "1.6rem", fontWeight: 800, color: stat.color, lineHeight: 1 }}>{stat.value}</div>
-              <div style={{ fontSize: "0.7rem", color: "#555", marginTop: "0.25rem" }}>{stat.unit}</div>
-              <div style={{ fontSize: "0.75rem", color: "#444", marginTop: "0.2rem" }}>{stat.label}</div>
-            </div>
-          ))}
-        </div>
-
-        {/* Schedule + Habits */}
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "1.5rem", marginBottom: "1.5rem" }}>
-
-          {/* Today's schedule */}
-          <div style={card}>
-            <h2 style={{ fontFamily: "'Playfair Display', serif", fontSize: "1rem", fontWeight: 700, color: "#fff", margin: "0 0 1.25rem" }}>
-              Today&apos;s Schedule
-            </h2>
-            {isRestDay ? (
-              <div style={{ textAlign: "center", padding: "2rem 0" }}>
-                <div style={{ fontSize: "2rem", marginBottom: "0.5rem" }}>🛌</div>
-                <p style={{ color: "#555", fontSize: "0.85rem", margin: 0 }}>Rest day — no study blocks</p>
-              </div>
-            ) : todaySchedule.length === 0 ? (
-              <p style={{ color: "#555", fontSize: "0.85rem", margin: 0 }}>No blocks scheduled</p>
-            ) : (
-              <div style={{ display: "flex", flexDirection: "column", gap: "0.6rem" }}>
-                {todaySchedule.map((block) => (
-                  <div key={block.id} style={{
-                    display: "flex", alignItems: "center", gap: "0.75rem",
-                    padding: "0.65rem 0.85rem", background: "#141414",
-                    borderRadius: "10px", border: "1px solid #1e1e1e",
-                  }}>
-                    <div style={{ width: "3px", height: "2.2rem", borderRadius: "999px", background: "#7c3aed", flexShrink: 0 }} />
-                    <div style={{ flex: 1, minWidth: 0 }}>
-                      <div style={{ fontSize: "0.82rem", fontWeight: 600, color: "#e0e0e0", marginBottom: "0.1rem" }}>{block.subject}</div>
-                      <div style={{ fontSize: "0.72rem", color: "#555" }}>{block.time} · {block.durationMinutes}min</div>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
-
-          {/* Habit checklist */}
-          <div style={card}>
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "1.25rem" }}>
-              <h2 style={{ fontFamily: "'Playfair Display', serif", fontSize: "1rem", fontWeight: 700, color: "#fff", margin: 0 }}>
-                Daily Habits
-              </h2>
-              <span style={{ color: "#a78bfa", fontSize: "0.8rem", fontWeight: 600 }}>{completedHabits}/{todayHabits.length}</span>
-            </div>
-
-            <div style={{ height: "3px", background: "#1e1e1e", borderRadius: "999px", marginBottom: "1rem", overflow: "hidden" }}>
-              <div style={{
-                height: "100%", width: `${habitPercent}%`,
-                background: "linear-gradient(90deg, #7c3aed, #4ade80)",
-                borderRadius: "999px", transition: "width 0.4s ease",
-              }} />
-            </div>
-
-            <div style={{ display: "flex", flexDirection: "column", gap: "0.5rem" }}>
-              {todayHabits.map((habit) => {
-                const done = !!habitCompletions[habit.id];
-                return (
-                  <div key={habit.id} onClick={() => toggleHabit(habit.id)} style={{
-                    display: "flex", alignItems: "center", gap: "0.75rem",
-                    padding: "0.6rem 0.75rem",
-                    background: done ? "rgba(74,222,128,0.06)" : "#141414",
-                    borderRadius: "10px",
-                    border: `1px solid ${done ? "#4ade8022" : "#1e1e1e"}`,
-                    cursor: "pointer", transition: "all 0.15s",
-                  }}>
-                    <div style={{
-                      width: "18px", height: "18px", borderRadius: "50%",
-                      border: `2px solid ${done ? "#4ade80" : "#333"}`,
-                      background: done ? "#4ade80" : "transparent",
-                      display: "flex", alignItems: "center", justifyContent: "center",
-                      flexShrink: 0, transition: "all 0.15s",
-                    }}>
-                      {done && <span style={{ color: "#000", fontSize: "0.65rem", fontWeight: 800 }}>✓</span>}
-                    </div>
-                    <span style={{
-                      fontSize: "0.82rem", fontWeight: 500,
-                      color: done ? "#4ade80" : "#c0c0c0",
-                      textDecoration: done ? "line-through" : "none",
-                      opacity: done ? 0.7 : 1,
-                    }}>{habit.habit}</span>
-                  </div>
-                );
-              })}
-            </div>
-          </div>
-        </div>
-
-        {/* Nav cards */}
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: "1rem", marginBottom: "1.5rem" }}>
-          {[
-            { label: "Full Plan", desc: "Diagnosis & strategy", icon: "📋", path: "/plan" },
-            { label: "Schedule", desc: "Weekly timetable", icon: "📅", path: "/schedule" },
-            { label: "Coach", desc: "Chat with your coach", icon: "💬", path: "/coach" },
-            { label: "Progress", desc: "Track your growth", icon: "📈", path: "/progress" },
-          ].map((item) => (
-            <div key={item.path} onClick={() => router.push(item.path)} style={{
-              background: "#111111", border: "1px solid #1e1e1e", borderRadius: "14px",
-              padding: "1.25rem", cursor: "pointer", transition: "all 0.15s",
-            }}
-              onMouseEnter={(e) => { (e.currentTarget as HTMLDivElement).style.borderColor = "#7c3aed44"; (e.currentTarget as HTMLDivElement).style.background = "#141414"; }}
-              onMouseLeave={(e) => { (e.currentTarget as HTMLDivElement).style.borderColor = "#1e1e1e"; (e.currentTarget as HTMLDivElement).style.background = "#111111"; }}
-            >
-              <div style={{ fontSize: "1.4rem", marginBottom: "0.5rem" }}>{item.icon}</div>
-              <div style={{ fontWeight: 600, fontSize: "0.875rem", color: "#e0e0e0", marginBottom: "0.2rem" }}>{item.label}</div>
-              <div style={{ fontSize: "0.75rem", color: "#555" }}>{item.desc}</div>
-            </div>
-          ))}
-        </div>
-
-        {/* Study method */}
-        <div style={card}>
-          <div style={{ display: "flex", alignItems: "flex-start", gap: "1rem" }}>
+          <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
             <div style={{
-              width: "36px", height: "36px", borderRadius: "10px",
-              background: "rgba(124,58,237,0.15)",
+              width: "28px", height: "28px",
+              background: "linear-gradient(135deg, #7c3aed, #ec4899)",
+              borderRadius: "8px",
               display: "flex", alignItems: "center", justifyContent: "center",
-              fontSize: "1rem", flexShrink: 0,
-            }}>📚</div>
-            <div>
-              <p style={{ color: "#555", fontSize: "0.72rem", margin: "0 0 0.3rem", textTransform: "uppercase", letterSpacing: "0.08em" }}>
-                Your Primary Study Method
-              </p>
-              <p style={{ color: "#e0e0e0", fontSize: "0.9rem", fontWeight: 600, margin: "0 0 0.25rem" }}>
-                {masterPlan.strategy.primaryStudyMethod}
-              </p>
-              <p style={{ color: "#666", fontSize: "0.8rem", margin: 0 }}>
-                {masterPlan.strategy.primaryMethodDescription}
-              </p>
-            </div>
+              fontSize: "0.85rem",
+            }}>⚡</div>
+            <span style={{
+              fontFamily: "'Playfair Display', serif",
+              fontSize: "1.1rem",
+              fontWeight: 900,
+              background: "linear-gradient(135deg, #a78bfa 0%, #ec4899 100%)",
+              WebkitBackgroundClip: "text",
+              WebkitTextFillColor: "transparent",
+              backgroundClip: "text",
+            }}>PeakMind</span>
+          </div>
+
+          <div style={{ display: "flex", gap: "0.5rem", alignItems: "center" }}>
+            {navItems.map((item) => (
+              <button
+                key={item.path}
+                type="button"
+                className={`pm-nav-btn${pathname === item.path ? " active" : ""}`}
+                onClick={() => router.push(item.path)}
+
+              >
+                <span style={{ marginRight: "0.35rem", fontSize: "0.75rem" }}>{item.icon}</span>
+                {item.label}
+              </button>
+            ))}
           </div>
         </div>
 
-      </div>
+        <div style={{ maxWidth: "920px", margin: "0 auto", padding: "2.5rem 1.5rem 0", position: "relative", zIndex: 1 }}>
 
-      {/* DEV: reload test data — fixed bottom-right corner */}
-      <button type="button" onClick={loadTestData} style={{
-        position: "fixed", bottom: "1rem", right: "1rem",
-        padding: "0.3rem 0.65rem", fontSize: "0.68rem", color: "#666",
-        background: "#111", border: "1px solid #2a2a2a", borderRadius: "6px",
-        cursor: "pointer", fontFamily: "monospace", opacity: 0.6,
-        zIndex: 9999, transition: "opacity 0.15s",
-      }}
-        onMouseEnter={(e) => { (e.currentTarget).style.opacity = "1"; (e.currentTarget).style.color = "#aaa"; }}
-        onMouseLeave={(e) => { (e.currentTarget).style.opacity = "0.6"; (e.currentTarget).style.color = "#666"; }}
-      >
-        [dev] load test data
-      </button>
-    </div>
+          {/* Header */}
+          <div className="stagger-1" style={{ marginBottom: "2.5rem" }}>
+            <p style={{ color: "#4a4a5a", fontSize: "0.8rem", margin: "0 0 0.3rem", letterSpacing: "0.04em" }}>
+              {mounted ? formatDate() : ""}
+            </p>
+            <h1 style={{
+              fontFamily: "'Playfair Display', serif",
+              fontSize: "clamp(1.8rem, 3.5vw, 2.4rem)",
+              fontWeight: 900,
+              margin: "0 0 0.5rem",
+              background: "linear-gradient(135deg, #ffffff 0%, #c4b5fd 60%, #f9a8d4 100%)",
+              WebkitBackgroundClip: "text",
+              WebkitTextFillColor: "transparent",
+              backgroundClip: "text",
+              lineHeight: 1.2,
+            }}>
+              {mounted ? greeting.text : "Welcome"}, {studentProfile.name.split(" ")[0]}{" "}
+              <span style={{ WebkitTextFillColor: "initial", WebkitBackgroundClip: "initial" }}>
+                {mounted ? greeting.icon : "👋"}
+              </span>
+            </h1>
+            <p style={{ color: "#4a4a5a", fontSize: "0.88rem", margin: 0 }}>
+              {isRestDay
+                ? "Today is a rest day. Recover well."
+                : `${todaySchedule.length} study blocks · ${todayHabits.length} habits to complete`}
+            </p>
+          </div>
+
+          {/* Key insight banner */}
+          <div className="pm-insight-card stagger-2" style={{
+            marginBottom: "1.5rem",
+            border: `1px solid ${urgencyColors[masterPlan.diagnosis.urgencyLevel]}28`,
+            borderLeft: `3px solid ${urgencyColors[masterPlan.diagnosis.urgencyLevel]}`,
+            boxShadow: `0 0 30px ${urgencyGlow[masterPlan.diagnosis.urgencyLevel]}, inset 0 0 30px ${urgencyGlow[masterPlan.diagnosis.urgencyLevel]}`,
+          }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: "1rem" }}>
+              <div>
+                <p style={{ color: "#4a4a5a", fontSize: "0.68rem", margin: "0 0 0.5rem", textTransform: "uppercase", letterSpacing: "0.1em", fontWeight: 600 }}>
+                  Your Key Insight
+                </p>
+                <p style={{ color: "#d4d4d8", fontSize: "0.9rem", margin: 0, lineHeight: 1.65 }}>
+                  {masterPlan.diagnosis.keyInsight}
+                </p>
+              </div>
+              <span style={{
+                flexShrink: 0,
+                padding: "0.3rem 0.75rem",
+                borderRadius: "999px",
+                fontSize: "0.65rem",
+                fontWeight: 700,
+                textTransform: "uppercase",
+                letterSpacing: "0.08em",
+                background: `${urgencyColors[masterPlan.diagnosis.urgencyLevel]}18`,
+                color: urgencyColors[masterPlan.diagnosis.urgencyLevel],
+                border: `1px solid ${urgencyColors[masterPlan.diagnosis.urgencyLevel]}40`,
+                boxShadow: `0 0 10px ${urgencyColors[masterPlan.diagnosis.urgencyLevel]}25`,
+              }}>
+                {masterPlan.diagnosis.urgencyLevel}
+              </span>
+            </div>
+          </div>
+
+          {/* Stats */}
+          <div className="stagger-3" style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: "1rem", marginBottom: "1.5rem" }}>
+            {/* Streak */}
+            <div className="pm-stat-card" style={{ borderColor: "rgba(167,139,250,0.15)" }}>
+              <div style={{ fontSize: "1.6rem", marginBottom: "0.5rem" }}>🔥</div>
+              <div className="pm-streak-num" style={{ fontSize: "2rem", fontWeight: 900, color: "#a78bfa", lineHeight: 1 }}>
+                {streakCount}
+              </div>
+              <div style={{ fontSize: "0.65rem", color: "#4a4a5a", marginTop: "0.3rem", textTransform: "uppercase", letterSpacing: "0.08em" }}>days</div>
+              <div style={{ fontSize: "0.75rem", color: "#6b6b7b", marginTop: "0.2rem", fontWeight: 500 }}>Study Streak</div>
+            </div>
+
+            {/* Hours */}
+            <div className="pm-stat-card" style={{ borderColor: "rgba(59,130,246,0.15)" }}>
+              <div style={{ fontSize: "1.6rem", marginBottom: "0.5rem" }}>⏱️</div>
+              <div style={{ fontSize: "2rem", fontWeight: 900, color: "#60a5fa", lineHeight: 1 }}>
+                {studyHoursToday.toFixed(1)}
+              </div>
+              <div style={{ fontSize: "0.65rem", color: "#4a4a5a", marginTop: "0.3rem", textTransform: "uppercase", letterSpacing: "0.08em" }}>hrs</div>
+              <div style={{ fontSize: "0.75rem", color: "#6b6b7b", marginTop: "0.2rem", fontWeight: 500 }}>Hours Today</div>
+            </div>
+
+            {/* Habits */}
+            <div className="pm-stat-card" style={{ borderColor: "rgba(74,222,128,0.15)" }}>
+              <div style={{ fontSize: "1.6rem", marginBottom: "0.5rem" }}>✅</div>
+              <div style={{ fontSize: "2rem", fontWeight: 900, color: "#4ade80", lineHeight: 1 }}>
+                {completedHabits}
+                <span style={{ fontSize: "1.1rem", color: "#4a4a5a", fontWeight: 500 }}>/{todayHabits.length}</span>
+              </div>
+              <div style={{ fontSize: "0.65rem", color: "#4a4a5a", marginTop: "0.3rem", textTransform: "uppercase", letterSpacing: "0.08em" }}>{habitPercent}% done</div>
+              <div style={{ fontSize: "0.75rem", color: "#6b6b7b", marginTop: "0.2rem", fontWeight: 500 }}>Habits Done</div>
+            </div>
+          </div>
+
+          {/* Schedule + Habits */}
+          <div className="stagger-4" style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "1.5rem", marginBottom: "1.5rem" }}>
+
+            {/* Today's schedule */}
+            <div className="pm-glass-card">
+              <h2 style={{
+                fontFamily: "'Playfair Display', serif",
+                fontSize: "1rem", fontWeight: 700, color: "#e4e4f0", margin: "0 0 1.25rem",
+                display: "flex", alignItems: "center", gap: "0.5rem",
+              }}>
+                <span style={{
+                  width: "6px", height: "6px", borderRadius: "50%",
+                  background: "linear-gradient(135deg, #7c3aed, #ec4899)",
+                  display: "inline-block",
+                }} />
+                Today&apos;s Schedule
+              </h2>
+              {isRestDay ? (
+                <div style={{ textAlign: "center", padding: "2.5rem 0" }}>
+                  <div style={{ fontSize: "2.5rem", marginBottom: "0.75rem" }}>🛌</div>
+                  <p style={{ color: "#4a4a5a", fontSize: "0.85rem", margin: 0 }}>Rest day — no study blocks</p>
+                </div>
+              ) : todaySchedule.length === 0 ? (
+                <p style={{ color: "#4a4a5a", fontSize: "0.85rem", margin: 0 }}>No blocks scheduled</p>
+              ) : (
+                <div style={{ display: "flex", flexDirection: "column", gap: "0.5rem" }}>
+                  {todaySchedule.map((block, i) => {
+                    const colors = subjectColors[block.subject] ?? subjectColors.default;
+                    return (
+                      <div key={block.id} className="pm-schedule-block" style={{ animationDelay: `${0.05 * i}s` }}>
+                        <div style={{
+                          width: "3px", height: "2.4rem", borderRadius: "999px",
+                          background: colors.accent, flexShrink: 0,
+                          boxShadow: `0 0 8px ${colors.accent}60`,
+                        }} />
+                        <div style={{
+                          width: "32px", height: "32px", borderRadius: "8px",
+                          background: colors.bg, flexShrink: 0,
+                          display: "flex", alignItems: "center", justifyContent: "center",
+                          fontSize: "0.7rem", fontWeight: 700, color: colors.accent,
+                        }}>
+                          {block.subject.slice(0, 2).toUpperCase()}
+                        </div>
+                        <div style={{ flex: 1, minWidth: 0 }}>
+                          <div style={{ fontSize: "0.82rem", fontWeight: 600, color: "#e0e0e8", marginBottom: "0.1rem" }}>{block.subject}</div>
+                          <div style={{ fontSize: "0.7rem", color: "#4a4a5a" }}>{block.time} · {block.durationMinutes}min · {block.method}</div>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+
+            {/* Habit checklist */}
+            <div className="pm-glass-card">
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "1rem" }}>
+                <h2 style={{
+                  fontFamily: "'Playfair Display', serif",
+                  fontSize: "1rem", fontWeight: 700, color: "#e4e4f0", margin: 0,
+                  display: "flex", alignItems: "center", gap: "0.5rem",
+                }}>
+                  <span style={{
+                    width: "6px", height: "6px", borderRadius: "50%",
+                    background: "linear-gradient(135deg, #4ade80, #22d3ee)",
+                    display: "inline-block",
+                  }} />
+                  Daily Habits
+                </h2>
+                <span style={{
+                  color: "#a78bfa", fontSize: "0.78rem", fontWeight: 700,
+                  background: "rgba(167,139,250,0.1)", padding: "0.2rem 0.6rem",
+                  borderRadius: "999px", border: "1px solid rgba(167,139,250,0.2)",
+                }}>
+                  {completedHabits}/{todayHabits.length}
+                </span>
+              </div>
+
+              {/* Progress bar */}
+              <div style={{ height: "4px", background: "rgba(255,255,255,0.06)", borderRadius: "999px", marginBottom: "1rem", overflow: "hidden" }}>
+                <div className="pm-progress-bar" style={{
+                  height: "100%",
+                  width: `${habitPercent}%`,
+                  background: "linear-gradient(90deg, #7c3aed, #4ade80)",
+                  borderRadius: "999px",
+                  boxShadow: "0 0 8px rgba(124,58,237,0.5)",
+                  transition: "width 0.6s cubic-bezier(0.4,0,0.2,1)",
+                }} />
+              </div>
+
+              <div style={{ display: "flex", flexDirection: "column", gap: "0.45rem" }}>
+                {todayHabits.map((habit) => {
+                  const done = !!habitCompletions[habit.id];
+                  return (
+                    <div
+                      key={habit.id}
+                      className="pm-habit-row"
+                      onClick={() => toggleHabit(habit.id)}
+                      style={{
+                        background: done ? "rgba(74,222,128,0.07)" : "rgba(255,255,255,0.02)",
+                        borderColor: done ? "rgba(74,222,128,0.2)" : "rgba(255,255,255,0.06)",
+                      }}
+                    >
+                      <div style={{
+                        width: "20px", height: "20px", borderRadius: "50%",
+                        border: `2px solid ${done ? "#4ade80" : "rgba(255,255,255,0.15)"}`,
+                        background: done ? "linear-gradient(135deg, #4ade80, #22d3ee)" : "transparent",
+                        display: "flex", alignItems: "center", justifyContent: "center",
+                        flexShrink: 0,
+                        transition: "all 0.25s cubic-bezier(0.4,0,0.2,1)",
+                        boxShadow: done ? "0 0 10px rgba(74,222,128,0.4)" : "none",
+                      }}>
+                        {done && (
+                          <span className="check-icon" style={{ color: "#000", fontSize: "0.6rem", fontWeight: 900, lineHeight: 1 }}>✓</span>
+                        )}
+                      </div>
+                      <span style={{
+                        fontSize: "0.8rem",
+                        fontWeight: 500,
+                        color: done ? "#4ade80" : "#a0a0b0",
+                        textDecoration: done ? "line-through" : "none",
+                        opacity: done ? 0.75 : 1,
+                        transition: "all 0.25s",
+                        flex: 1,
+                      }}>{habit.habit}</span>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          </div>
+
+          {/* Nav cards */}
+          <div className="stagger-5" style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: "1rem", marginBottom: "1.5rem" }}>
+            {[
+              { label: "Full Plan", desc: "Diagnosis & strategy", icon: "📋", path: "/plan", color: "#8b5cf6" },
+              { label: "Schedule", desc: "Weekly timetable", icon: "📅", path: "/schedule", color: "#3b82f6" },
+              { label: "AI Coach", desc: "Chat with your coach", icon: "💬", path: "/coach", color: "#ec4899" },
+              { label: "Progress", desc: "Track your growth", icon: "📈", path: "/progress", color: "#10b981" },
+            ].map((item) => (
+              <div
+                key={item.path}
+                className="pm-nav-card"
+                onClick={() => router.push(item.path)}
+              >
+                <div style={{
+                  width: "40px", height: "40px", borderRadius: "12px",
+                  background: `${item.color}18`,
+                  border: `1px solid ${item.color}30`,
+                  display: "flex", alignItems: "center", justifyContent: "center",
+                  fontSize: "1.2rem", marginBottom: "0.75rem",
+                  transition: "all 0.2s",
+                }}>{item.icon}</div>
+                <div style={{ fontWeight: 700, fontSize: "0.875rem", color: "#e4e4f0", marginBottom: "0.25rem" }}>{item.label}</div>
+                <div style={{ fontSize: "0.73rem", color: "#4a4a5a", lineHeight: 1.4 }}>{item.desc}</div>
+                <div style={{
+                  marginTop: "0.85rem",
+                  fontSize: "0.7rem",
+                  color: item.color,
+                  display: "flex",
+                  alignItems: "center",
+                  gap: "0.25rem",
+                  opacity: 0.8,
+                  fontWeight: 500,
+                }}>
+                  Open →
+                </div>
+              </div>
+            ))}
+          </div>
+
+          {/* Study method */}
+          <div className="pm-glass-card stagger-6" style={{
+            background: "rgba(124,58,237,0.06)",
+            borderColor: "rgba(124,58,237,0.2)",
+            boxShadow: "0 0 30px rgba(124,58,237,0.08)",
+          }}>
+            <div style={{ display: "flex", alignItems: "flex-start", gap: "1rem" }}>
+              <div style={{
+                width: "44px", height: "44px", borderRadius: "12px",
+                background: "rgba(124,58,237,0.2)",
+                border: "1px solid rgba(124,58,237,0.3)",
+                display: "flex", alignItems: "center", justifyContent: "center",
+                fontSize: "1.2rem", flexShrink: 0,
+                boxShadow: "0 0 16px rgba(124,58,237,0.25)",
+              }}>📚</div>
+              <div style={{ flex: 1 }}>
+                <p style={{ color: "#4a4a5a", fontSize: "0.67rem", margin: "0 0 0.35rem", textTransform: "uppercase", letterSpacing: "0.1em", fontWeight: 600 }}>
+                  Your Primary Study Method
+                </p>
+                <p style={{ color: "#e4e4f0", fontSize: "0.92rem", fontWeight: 700, margin: "0 0 0.35rem" }}>
+                  {masterPlan.strategy.primaryStudyMethod}
+                </p>
+                <p style={{ color: "#5a5a6a", fontSize: "0.8rem", margin: 0, lineHeight: 1.6 }}>
+                  {masterPlan.strategy.primaryMethodDescription}
+                </p>
+              </div>
+            </div>
+          </div>
+
+        </div>
+
+        {/* DEV: reload test data */}
+        <button type="button" onClick={loadTestData} style={{
+          position: "fixed", bottom: "1rem", right: "1rem",
+          padding: "0.3rem 0.65rem", fontSize: "0.68rem", color: "#444",
+          background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.08)", borderRadius: "6px",
+          cursor: "pointer", fontFamily: "monospace", opacity: 0.5,
+          zIndex: 9999, transition: "opacity 0.15s",
+        }}
+          onMouseEnter={(e) => { e.currentTarget.style.opacity = "1"; e.currentTarget.style.color = "#aaa"; }}
+          onMouseLeave={(e) => { e.currentTarget.style.opacity = "0.5"; e.currentTarget.style.color = "#444"; }}
+        >
+          [dev] load test data
+        </button>
+      </div>
+    </>
   );
 }
-
