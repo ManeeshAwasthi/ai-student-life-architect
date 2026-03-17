@@ -57,6 +57,11 @@ export default function GeneratingPage() {
     }
   }, [studentProfile, router]);
 
+  // Reset hasFetched so a new profile triggers a fresh generation
+  useEffect(() => {
+    hasFetched.current = false;
+  }, [studentProfile]);
+
   const updateStep = (id: string, status: Step["status"]) => {
     setSteps((prev) => prev.map((s) => (s.id === id ? { ...s, status } : s)));
   };
@@ -67,14 +72,30 @@ export default function GeneratingPage() {
     hasFetched.current = true;
 
     const generate = async () => {
+      // 90-second safety timeout — shows error if nothing completes
+      const abortController = new AbortController();
+      const timeoutId = setTimeout(() => {
+        abortController.abort();
+        console.error("[generating] 90s timeout — aborting");
+        setHasError(true);
+        setErrorMessage("Generation timed out after 90 seconds. Please try again.");
+        setSteps((prev) =>
+          prev.map((s) => (s.status === "active" ? { ...s, status: "error" } : s))
+        );
+      }, 90_000);
+
       try {
         const response = await fetch("/api/generate-plan", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ profile: studentProfile }),
+          signal: abortController.signal,
         });
 
-        if (!response.ok || !response.body) throw new Error("Failed to connect");
+        if (!response.ok || !response.body) {
+          console.error("[generating] Bad response:", response.status, response.statusText);
+          throw new Error(`Server error ${response.status}: ${response.statusText}`);
+        }
 
         const reader = response.body.getReader();
         const decoder = new TextDecoder();
@@ -91,29 +112,46 @@ export default function GeneratingPage() {
             if (!line.startsWith("data: ")) continue;
             const raw = line.slice(6).trim();
             if (!raw) continue;
+
+            // Parse JSON separately so a throw here is caught by the OUTER catch
+            let data: Record<string, unknown>;
             try {
-              const data = JSON.parse(raw);
-              if (data.status === "active") {
-                updateStep(data.step, "active");
-                setCurrentMessage(MSG_MAP[data.step] ?? "Working…");
-              } else if (data.status === "complete" && data.step !== "complete") {
-                updateStep(data.step, "complete");
-              } else if (data.step === "complete" && data.plan) {
-                setSteps((prev) => prev.map((s) => ({ ...s, status: "complete" })));
-                setCurrentMessage(MSG_MAP.complete);
-                setMasterPlan(data.plan);
-                setIsOnboarded(true);
-                setTimeout(() => router.push("/dashboard"), 1500);
-              } else if (data.status === "error") {
-                throw new Error(data.message ?? "Generation failed");
-              }
-            } catch { /* skip malformed */ }
+              data = JSON.parse(raw) as Record<string, unknown>;
+            } catch (parseErr) {
+              console.error("[generating] Failed to parse SSE line:", parseErr, raw);
+              continue; // skip malformed — but don't swallow server error events
+            }
+
+            // Handle each event type — errors now properly propagate out
+            if (data.status === "error") {
+              const msg = (data.message as string) ?? "Generation failed";
+              console.error("[generating] Server error event:", msg);
+              throw new Error(msg);
+            } else if (data.status === "active") {
+              updateStep(data.step as string, "active");
+              setCurrentMessage(MSG_MAP[data.step as string] ?? "Working…");
+            } else if (data.status === "complete" && data.step !== "complete") {
+              updateStep(data.step as string, "complete");
+            } else if (data.step === "complete" && data.plan) {
+              clearTimeout(timeoutId);
+              setSteps((prev) => prev.map((s) => ({ ...s, status: "complete" })));
+              setCurrentMessage(MSG_MAP.complete);
+              setMasterPlan(data.plan as Parameters<typeof setMasterPlan>[0]);
+              setIsOnboarded(true);
+              setTimeout(() => router.push("/dashboard"), 1500);
+            }
           }
         }
       } catch (err) {
+        if ((err as Error).name === "AbortError") return; // timeout already handled above
+        console.error("[generating] Fatal error:", err);
         setHasError(true);
         setErrorMessage(err instanceof Error ? err.message : "Something went wrong");
-        setSteps((prev) => prev.map((s) => s.status === "active" ? { ...s, status: "error" } : s));
+        setSteps((prev) =>
+          prev.map((s) => (s.status === "active" ? { ...s, status: "error" } : s))
+        );
+      } finally {
+        clearTimeout(timeoutId);
       }
     };
 
