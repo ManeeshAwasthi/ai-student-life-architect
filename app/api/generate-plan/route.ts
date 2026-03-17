@@ -13,49 +13,62 @@ import {
 
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY ?? "");
 
-// Strip all markdown fences and surrounding whitespace before JSON.parse
+// Aggressive JSON extraction: strip fences, then cut to first { ... last }
 function safeParseJSON(text: string): unknown {
   try {
-    const cleaned = text
+    let cleaned = text
       .replace(/```json\s*/gi, "")
       .replace(/```\s*/g, "")
-      .replace(/^\s+|\s+$/g, "")
       .trim();
+
+    // Remove any preamble text before the first opening brace
+    const firstBrace = cleaned.indexOf("{");
+    if (firstBrace > 0) cleaned = cleaned.slice(firstBrace);
+
+    // Remove any trailing text after the last closing brace
+    const lastBrace = cleaned.lastIndexOf("}");
+    if (lastBrace !== -1 && lastBrace < cleaned.length - 1) {
+      cleaned = cleaned.slice(0, lastBrace + 1);
+    }
+
     return JSON.parse(cleaned);
   } catch {
     throw new Error(
-      `JSON parse failed. Raw response (first 400 chars): ${text.slice(0, 400)}`
+      `JSON parse failed. Raw response (first 500 chars): ${text.slice(0, 500)}`
     );
   }
 }
 
-// Rejects after `ms` milliseconds with a clear label in the error message
+// Promise.race-based timeout — 55 seconds per step
 function withTimeout<T>(promise: Promise<T>, ms: number, label: string): Promise<T> {
-  return new Promise<T>((resolve, reject) => {
-    const timer = setTimeout(
+  const timeout = new Promise<never>((_, reject) =>
+    setTimeout(
       () => reject(new Error(`Timeout: "${label}" exceeded ${ms / 1000}s`)),
       ms
-    );
-    promise.then(
-      (val) => { clearTimeout(timer); resolve(val); },
-      (err) => { clearTimeout(timer); reject(err); }
-    );
-  });
+    )
+  );
+  return Promise.race([promise, timeout]);
 }
 
+// Gemini call: system prompt is prepended to the user message (no systemInstruction param)
+// so this works with any SDK version
 async function callGemini(prompt: string, stepLabel: string): Promise<unknown> {
-  console.log(`[generate-plan] ▶ starting: ${stepLabel}`);
-  const model = genAI.getGenerativeModel({
-    model: "gemini-1.5-flash-latest",
-    systemInstruction: JSON_SYSTEM_PROMPT,
-  });
+  console.log(`[generate-plan] ▶ START ${stepLabel}`);
+
+  const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
+
+  // Prepend system context directly into the prompt
+  const fullPrompt = `${JSON_SYSTEM_PROMPT}\n\n${prompt}`;
+
   const result = await withTimeout(
-    model.generateContent(prompt),
-    60_000,
+    model.generateContent(fullPrompt),
+    55_000,
     stepLabel
   );
+
   const text = result.response.text();
-  console.log(`[generate-plan] ◀ received: ${stepLabel} (${text.length} chars)`);
+  console.log(`[generate-plan] ◀ END ${stepLabel} — ${text.length} chars received`);
+
   return safeParseJSON(text);
 }
 
@@ -68,7 +81,8 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Student profile is required" }, { status: 400 });
     }
 
-    console.log(`[generate-plan] Starting plan generation for: ${profile.name}`);
+    console.log(`[generate-plan] === Starting for: ${profile.name} ===`);
+
     const encoder = new TextEncoder();
 
     const stream = new ReadableStream({
@@ -82,75 +96,87 @@ export async function POST(request: NextRequest) {
           send({ step: "diagnosis", status: "active" });
           let diagnosis: Diagnosis;
           try {
+            console.log("[generate-plan] Step 1/6 — diagnosis");
             diagnosis = await callGemini(buildDiagnosisPrompt(profile), "diagnosis") as Diagnosis;
             send({ step: "diagnosis", status: "complete" });
-            console.log("[generate-plan] ✓ diagnosis complete");
+            console.log("[generate-plan] ✓ Step 1/6 diagnosis complete");
           } catch (err) {
-            console.error("[generate-plan] ✗ diagnosis failed:", err instanceof Error ? err.message : err);
-            throw err;
+            const msg = err instanceof Error ? err.message : String(err);
+            console.error(`[generate-plan] ✗ Step 1/6 diagnosis FAILED: ${msg}`);
+            throw new Error(`Diagnosis step failed: ${msg}`);
           }
 
           // ── Step 2: Strategy ───────────────────────────────────────────────
           send({ step: "strategy", status: "active" });
           let strategy: Strategy;
           try {
+            console.log("[generate-plan] Step 2/6 — strategy");
             strategy = await callGemini(buildStrategyPrompt(profile, diagnosis), "strategy") as Strategy;
             send({ step: "strategy", status: "complete" });
-            console.log("[generate-plan] ✓ strategy complete");
+            console.log("[generate-plan] ✓ Step 2/6 strategy complete");
           } catch (err) {
-            console.error("[generate-plan] ✗ strategy failed:", err instanceof Error ? err.message : err);
-            throw err;
+            const msg = err instanceof Error ? err.message : String(err);
+            console.error(`[generate-plan] ✗ Step 2/6 strategy FAILED: ${msg}`);
+            throw new Error(`Strategy step failed: ${msg}`);
           }
 
           // ── Step 3: Schedule ───────────────────────────────────────────────
           send({ step: "schedule", status: "active" });
           let schedule: { dailyRoutine: MasterPlan["dailyRoutine"]; weeklySchedule: MasterPlan["weeklySchedule"] };
           try {
+            console.log("[generate-plan] Step 3/6 — schedule");
             schedule = await callGemini(buildSchedulePrompt(profile, strategy), "schedule") as typeof schedule;
             send({ step: "schedule", status: "complete" });
-            console.log("[generate-plan] ✓ schedule complete");
+            console.log("[generate-plan] ✓ Step 3/6 schedule complete");
           } catch (err) {
-            console.error("[generate-plan] ✗ schedule failed:", err instanceof Error ? err.message : err);
-            throw err;
+            const msg = err instanceof Error ? err.message : String(err);
+            console.error(`[generate-plan] ✗ Step 3/6 schedule FAILED: ${msg}`);
+            throw new Error(`Schedule step failed: ${msg}`);
           }
 
           // ── Step 4: Systems ────────────────────────────────────────────────
           send({ step: "systems", status: "active" });
           let systems: { habitSystem: MasterPlan["habitSystem"]; distractionControl: MasterPlan["distractionControl"] };
           try {
+            console.log("[generate-plan] Step 4/6 — systems");
             systems = await callGemini(buildSystemsPrompt(profile, diagnosis, strategy), "systems") as typeof systems;
             send({ step: "systems", status: "complete" });
-            console.log("[generate-plan] ✓ systems complete");
+            console.log("[generate-plan] ✓ Step 4/6 systems complete");
           } catch (err) {
-            console.error("[generate-plan] ✗ systems failed:", err instanceof Error ? err.message : err);
-            throw err;
+            const msg = err instanceof Error ? err.message : String(err);
+            console.error(`[generate-plan] ✗ Step 4/6 systems FAILED: ${msg}`);
+            throw new Error(`Systems step failed: ${msg}`);
           }
 
           // ── Step 5: Resources ──────────────────────────────────────────────
           send({ step: "resources", status: "active" });
           let resources: MasterPlan["resources"];
           try {
+            console.log("[generate-plan] Step 5/6 — resources");
             resources = await callGemini(buildResourcesPrompt(profile), "resources") as MasterPlan["resources"];
             send({ step: "resources", status: "complete" });
-            console.log("[generate-plan] ✓ resources complete");
+            console.log("[generate-plan] ✓ Step 5/6 resources complete");
           } catch (err) {
-            console.error("[generate-plan] ✗ resources failed:", err instanceof Error ? err.message : err);
-            throw err;
+            const msg = err instanceof Error ? err.message : String(err);
+            console.error(`[generate-plan] ✗ Step 5/6 resources FAILED: ${msg}`);
+            throw new Error(`Resources step failed: ${msg}`);
           }
 
           // ── Step 6: Weekly Review ──────────────────────────────────────────
           send({ step: "review", status: "active" });
           let weeklyReview: MasterPlan["weeklyReview"];
           try {
+            console.log("[generate-plan] Step 6/6 — weeklyReview");
             weeklyReview = await callGemini(buildWeeklyReviewPrompt(profile), "weeklyReview") as MasterPlan["weeklyReview"];
             send({ step: "review", status: "complete" });
-            console.log("[generate-plan] ✓ weeklyReview complete");
+            console.log("[generate-plan] ✓ Step 6/6 weeklyReview complete");
           } catch (err) {
-            console.error("[generate-plan] ✗ weeklyReview failed:", err instanceof Error ? err.message : err);
-            throw err;
+            const msg = err instanceof Error ? err.message : String(err);
+            console.error(`[generate-plan] ✗ Step 6/6 weeklyReview FAILED: ${msg}`);
+            throw new Error(`Weekly review step failed: ${msg}`);
           }
 
-          // ── Assemble final plan ────────────────────────────────────────────
+          // ── Assemble ──────────────────────────────────────────────────────
           const masterPlan: MasterPlan = {
             diagnosis,
             strategy,
@@ -168,15 +194,12 @@ export async function POST(request: NextRequest) {
           };
 
           send({ step: "complete", status: "complete", plan: masterPlan });
-          console.log("[generate-plan] ✓ Plan generation complete");
+          console.log("[generate-plan] === Plan generation COMPLETE ===");
 
         } catch (error) {
-          console.error("[generate-plan] Fatal error:", error instanceof Error ? error.message : error);
-          send({
-            step: "error",
-            status: "error",
-            message: error instanceof Error ? error.message : "Generation failed",
-          });
+          const msg = error instanceof Error ? error.message : "Generation failed";
+          console.error(`[generate-plan] FATAL: ${msg}`);
+          send({ step: "error", status: "error", message: msg });
         } finally {
           controller.close();
         }
@@ -193,10 +216,8 @@ export async function POST(request: NextRequest) {
     });
 
   } catch (error) {
-    console.error("[generate-plan] Request-level error:", error instanceof Error ? error.message : error);
-    return NextResponse.json(
-      { error: error instanceof Error ? error.message : "Internal server error" },
-      { status: 500 }
-    );
+    const msg = error instanceof Error ? error.message : "Internal server error";
+    console.error(`[generate-plan] Request-level error: ${msg}`);
+    return NextResponse.json({ error: msg }, { status: 500 });
   }
 }
