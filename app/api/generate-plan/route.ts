@@ -46,7 +46,7 @@ function withTimeout<T>(promise: Promise<T>, ms: number, label: string): Promise
 async function callGemini(prompt: string, stepLabel: string): Promise<unknown> {
   console.log(`[generate-plan] ▶ starting: ${stepLabel}`);
   const model = genAI.getGenerativeModel({
-    model: "gemini-1.5-flash-latest",
+    model: "gemini-2.0-flash",
     systemInstruction: JSON_SYSTEM_PROMPT,
   });
   const result = await withTimeout(
