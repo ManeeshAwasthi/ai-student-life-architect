@@ -103,7 +103,7 @@ Return ONLY this JSON:
       "isRestDay": false,
       "blocks": [
         {
-          "id": "block-1",
+          "id": "block-mon-1",
           "time": "09:00 - 10:30",
           "subject": "Subject name",
           "method": "Study method",
@@ -114,7 +114,7 @@ Return ONLY this JSON:
     }
   ]
 }
-Include all 7 days (Monday through Sunday). At least 1 full rest day with isRestDay: true and empty blocks array. Schedule deep work at energy peak time.`;
+Rules: all 7 days (Monday–Sunday). Max 3 study blocks per day. At least 1 full rest day (isRestDay: true, blocks: []). Schedule deep work at energy peak time. Keep notes under 10 words.`;
 }
 
 export function buildHabitSystemPrompt(
