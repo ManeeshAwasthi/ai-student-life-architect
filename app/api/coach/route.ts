@@ -1,11 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
-import Anthropic from "@anthropic-ai/sdk";
+import { GoogleGenerativeAI } from "@google/generative-ai";
 import type { Message, StudentProfile, MasterPlan } from "@/lib/types";
 import { buildCoachSystemPrompt } from "@/lib/prompts";
 
-const anthropic = new Anthropic({
-  apiKey: process.env.ANTHROPIC_API_KEY,
-});
+const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY ?? "");
 
 function buildPlanSummary(plan: MasterPlan): string {
   const subjects = plan.strategy.subjects
@@ -35,7 +33,10 @@ export async function POST(request: NextRequest) {
     } = await request.json();
 
     if (!messages || !profile || !plan) {
-      return NextResponse.json({ error: "Messages, profile, and plan are required" }, { status: 400 });
+      return NextResponse.json(
+        { error: "Messages, profile, and plan are required" },
+        { status: 400 }
+      );
     }
 
     const planSummary = buildPlanSummary(plan);
@@ -45,30 +46,46 @@ export async function POST(request: NextRequest) {
       profile.coachPersonality
     );
 
-    const anthropicMessages = messages.map((m) => ({
-      role: m.role as "user" | "assistant",
-      content: m.content,
-    }));
-
-    const stream = await anthropic.messages.stream({
-      model: "claude-sonnet-4-5",
-      max_tokens: 500,
-      system: systemPrompt,
-      messages: anthropicMessages,
+    const model = genAI.getGenerativeModel({
+      model: "gemini-1.5-flash",
+      systemInstruction: systemPrompt,
     });
 
+    // Build chat history from all messages except the last one
+    const history = messages.slice(0, -1).map((m) => ({
+      role: m.role === "user" ? "user" as const : "model" as const,
+      parts: [{ text: m.content }],
+    }));
+
+    const chat = model.startChat({ history });
+    const lastMessage = messages[messages.length - 1];
+
     const encoder = new TextEncoder();
+
     const readable = new ReadableStream({
       async start(controller) {
-        for await (const chunk of stream) {
-          if (chunk.type === "content_block_delta" && chunk.delta.type === "text_delta") {
-            controller.enqueue(
-              encoder.encode(`data: ${JSON.stringify({ text: chunk.delta.text })}\n\n`)
-            );
+        try {
+          const result = await chat.sendMessageStream(lastMessage.content);
+
+          for await (const chunk of result.stream) {
+            const text = chunk.text();
+            if (text) {
+              controller.enqueue(
+                encoder.encode(`data: ${JSON.stringify({ text })}\n\n`)
+              );
+            }
           }
+
+          controller.enqueue(encoder.encode(`data: [DONE]\n\n`));
+        } catch (error) {
+          controller.enqueue(
+            encoder.encode(
+              `data: ${JSON.stringify({ error: error instanceof Error ? error.message : "Stream failed" })}\n\n`
+            )
+          );
+        } finally {
+          controller.close();
         }
-        controller.enqueue(encoder.encode(`data: [DONE]\n\n`));
-        controller.close();
       },
     });
 
@@ -79,6 +96,7 @@ export async function POST(request: NextRequest) {
         Connection: "keep-alive",
       },
     });
+
   } catch (error) {
     return NextResponse.json(
       { error: error instanceof Error ? error.message : "Coach unavailable" },
